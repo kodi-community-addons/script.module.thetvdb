@@ -176,7 +176,9 @@ def getSeries(seriesid,ContinuingOnly=False):
     return seriesinfo
     
 def getContinuingSeries():
-    #only gets the continuing series, based on which series were recently updated as there is no other api call to get that information
+    '''
+        only gets the continuing series, based on which series were recently updated as there is no other api call to get that information
+    '''
     recent_series = getRecentlyUpdatedSeries()
     continuing_series = []
     for recent_serie in recent_series:
@@ -252,7 +254,6 @@ def searchSeries(name="",imdbId="",zap2itId=""):
         name --> Name of the series to search for.
         imdbId --> IMDB id of the series
         zap2itId -->  Zap2it ID of the series to search for.
-
     '''
     return getData("search/series?name=%s,imdbId=%s,zap2itId=%s" 
         %(seriesid,page,absoluteNumber,airedSeason,airedEpisode,dvdSeason,dvdEpisode,imdbId) )
@@ -315,6 +316,7 @@ def getUnAiredEpisodeList(seriesids):
 def getKodiSeriesUnairedEpisodesList(singleEpisodePerShow=True):
     '''
         Returns the next unaired episode for all continuing tv shows in the Kodi library
+        Defaults to a single episode (next unaired) for each show, to disable have False as argument.
     '''
     kodi_series = getKodiJSON('VideoLibrary.GetTvShows','{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
     
