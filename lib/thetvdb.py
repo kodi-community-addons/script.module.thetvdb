@@ -1,42 +1,29 @@
 # -*- coding: utf-8 -*-
 import requests
-import xbmc, xbmcgui, xbmcaddon
-import time, re, os
-from datetime import date, timedelta, datetime
-
+import xbmc, xbmcgui, xbmcaddon, xbmcvfs
+import time, re, os, base64
+from datetime import timedelta, date
+import datetime
+import unicodedata
 try:
     import simplejson as json
 except:
     import json
+import simplecache
 
 ADDON = xbmcaddon.Addon()
 ADDON_ID = ADDON.getAddonInfo('id').decode("utf-8")
-ADDON_ICON = ADDON.getAddonInfo('icon').decode("utf-8")
-ADDON_NAME = ADDON.getAddonInfo('name').decode("utf-8")
-ADDON_PATH = ADDON.getAddonInfo('path').decode("utf-8")
-ADDON_VERSION = ADDON.getAddonInfo('version').decode("utf-8")
-ADDON_DATA_PATH = xbmc.translatePath("special://profile/addon_data/%s" % ADDON_ID).decode("utf-8")
-KODI_VERSION  = int(xbmc.getInfoLabel( "System.BuildVersion" ).split(".")[0])
 WINDOW = xbmcgui.Window(10000)
-SETTING = ADDON.getSetting
-KODILANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
 USE_CACHE = True
 DAYS_AHEAD = 60
+CACHE_DEFAULT_EXPIRE_TIME = timedelta(days=2)
+simplecache.use_memory_cache = True
+simplecache.use_file_cache = True
 
 def logMsg(msg):
-	xbmc.log('{0} - thetvdb: {1}'.format(ADDON_ID, try_encode(msg)))
-
-def try_encode(text, encoding="utf-8"):
-    try:
-        return text.encode(encoding,"ignore")
-    except:
-        return text       
-
-def try_decode(text, encoding="utf-8"):
-    try:
-        return text.decode(encoding,"ignore")
-    except:
-        return text       
+    if isinstance(msg,unicode):
+        msg = msg.encode("utf-8")
+	xbmc.log('{0} - thetvdb: {1}'.format(ADDON_ID, try_encode(msg)))   
     
 def getToken(refresh=False):
     #get token from memory cache first
@@ -73,41 +60,39 @@ def getToken(refresh=False):
         return None
 
 def getKodiJSON(method,params):
-    json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }' %(method, try_encode(params)))
+    json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }' %(method, params.encode("utf-8")))
     jsonobject = json.loads(json_response.decode('utf-8','replace'))
     if(jsonobject.has_key('result')):
         jsonobject = jsonobject['result']
     return jsonobject
         
-def getData(endpoint):
+def getData(endpoint, overrideCacheExpiration=CACHE_DEFAULT_EXPIRE_TIME):
     
-    #use memory cache first
-    cachestr = "thetvdb--%s--%s" %(endpoint,date.today().strftime("%m%d%Y"))
-    cache = WINDOW.getProperty(cachestr)
-    if cache and USE_CACHE:
-        data = eval(cache)
-    else:
-        #grab the results from the api
-        url = 'https://api.thetvdb.com/' + endpoint
-        headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % getToken()}
+    #grab from cache first
+    if USE_CACHE:
+        cache = simplecache.get(endpoint)
+        if cache: return cache
+        
+    #grab the results from the api
+    url = 'https://api.thetvdb.com/' + endpoint
+    headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % getToken()}
+    response = requests.get(url, headers=headers, timeout=5)
+    data = {}
+    if response and response.content and response.status_code == 200:
+        data = json.loads(response.content.decode('utf-8','replace'))
+    elif response.status_code == 401:
+        #token expired, refresh it and repeat our request
+        headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % getToken(True)}
         response = requests.get(url, headers=headers, timeout=5)
-        data = {}
         if response and response.content and response.status_code == 200:
             data = json.loads(response.content.decode('utf-8','replace'))
-        elif response.status_code == 401:
-            #token expired, refresh it and repeat our request
-            headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % getToken(True)}
-            response = requests.get(url, headers=headers, timeout=5)
-            if response and response.content and response.status_code == 200:
-                data = json.loads(response.content.decode('utf-8','replace'))
 
-        if data.get("data"): 
-            data = data["data"]
-            
-        #store results in window cache
-        WINDOW.setProperty(cachestr,repr(data).decode("utf-8"))
-    
-    #return our data
+    if data.get("data"): 
+        data = data["data"]
+        
+    #store in cache and return our data
+    if USE_CACHE:
+        simplecache.set(endpoint, data, "", overrideCacheExpiration)
     return data
 
 def getSeriesPoster(seriesid,season=None):
@@ -116,7 +101,7 @@ def getSeriesPoster(seriesid,season=None):
     score = 0
     posterurl = ""
     if season:
-        images = getData("series/%s/images/query?keyType=season&subKey=%s" %(seriesid,season))
+        images = getData("series/%s/images/query?keyType=season&subKey=%s" %(seriesid,season),timedelta(days=60))
         for image in images:
             image_score = image["ratingsInfo"]["average"] * image["ratingsInfo"]["count"]
             if image_score > score:
@@ -124,7 +109,7 @@ def getSeriesPoster(seriesid,season=None):
                 score = image_score
                 
     if not posterurl:
-        images = getData("series/%s/images/query?keyType=poster" %(seriesid))
+        images = getData("series/%s/images/query?keyType=poster" %(seriesid),timedelta(days=60))
         for image in images:
             image_score = image["ratingsInfo"]["average"] * image["ratingsInfo"]["count"]
             if image_score > score:
@@ -138,7 +123,7 @@ def getSeriesFanart(seriesid,Landscape=False):
     
     score = 0
     fanarturl = ""
-    images = getData("series/%s/images/query?keyType=fanart" %(seriesid))
+    images = getData("series/%s/images/query?keyType=fanart" %(seriesid),timedelta(days=60))
     for image in images:
         if (image["subKey"] == "text" and Landscape) or (not Landscape and image["subKey"] == "graphical"):
             image_score = image["ratingsInfo"]["average"] * image["ratingsInfo"]["count"]
@@ -165,7 +150,7 @@ def getSeries(seriesid,ContinuingOnly=False):
         Returns a series record that contains all information known about a particular series id.
         Usage: specify the serie ID: getSeries(seriesid)
     '''
-    seriesinfo = getData("series/%s" %seriesid)
+    seriesinfo = getData("series/%s" %seriesid,timedelta(days=30))
     if ContinuingOnly and seriesinfo.get("status","") != "Continuing":
         return None
     seriesinfo["poster"] = getSeriesPoster(seriesid)
@@ -192,7 +177,7 @@ def getSeriesActors(seriesid):
         Returns actors for the given series id.
         Usage: specify the series ID: getSeriesActors(seriesid)
     '''
-    return getData("series/%s/actors" %seriesid)
+    return getData("series/%s/actors" %seriesid,timedelta(days=60))
        
 def getSeriesEpisodes(seriesid):
     '''
@@ -255,8 +240,8 @@ def searchSeries(name="",imdbId="",zap2itId=""):
         imdbId --> IMDB id of the series
         zap2itId -->  Zap2it ID of the series to search for.
     '''
-    return getData("search/series?name=%s,imdbId=%s,zap2itId=%s" 
-        %(seriesid,page,absoluteNumber,airedSeason,airedEpisode,dvdSeason,dvdEpisode,imdbId) )
+    return getData("search/series?name=%s&imdbId=%s&zap2itId=%s" 
+        %(name,imdbid,zap2itId) )
             
 def getRecentlyUpdatedSeries():
     '''
@@ -278,7 +263,7 @@ def getUnAiredEpisodes(seriesid):
         episodes = getSeriesEpisodes(seriesid)
         for episode in episodes:
             if episode["firstAired"] and episode["episodeName"]:
-                airdate = datetime.strptime(episode["firstAired"],"%Y-%m-%d").date()
+                airdate = datetime.datetime.strptime(episode["firstAired"],"%Y-%m-%d").date()
                 if airdate == date.today() or (airdate > date.today() and airdate < (date.today() + timedelta(days=DAYS_AHEAD)) ):
                     #if airdate is today or (max X days) in the future add to our list
                     episode = getEpisode(episode["id"])
@@ -312,73 +297,96 @@ def getUnAiredEpisodeList(seriesids):
                 
     #return our list sorted by date
     return sorted(next_episodes, key=lambda k: k.get('firstAired', ""))
+
+def getContinuingKodiSeries():
+    kodi_series = getKodiJSON('VideoLibrary.GetTvShows','{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
     
+    if USE_CACHE:
+        cache = simplecache.get("ContinuingKodiSeries",checksum=len(kodi_series))
+        if cache: return cache
+    
+    cont_series = []
+    if kodi_series and kodi_series.get("tvshows"):
+        for kodi_serie in kodi_series["tvshows"]:
+            tvdb_details = None
+            if kodi_serie["imdbnumber"] and kodi_serie["imdbnumber"].startswith("tt"):
+                #lookup serie by imdbid
+                result = searchSeries(imdbid=kodi_serie["imdbnumber"])
+                if result: tvdb_details = result[0]
+            elif kodi_serie["imdbnumber"]:
+                #imdbid in kodidb is already tvdb id
+                tvdb_details = getSeries(kodi_serie["imdbnumber"],True)
+            else:
+                #lookup series id by name
+                result = searchSeries(title=kodi_serie["title"])
+                if result: tvdb_details = search_serie[0]
+                
+            if tvdb_details and tvdb_details["status"] == "Continuing":
+                kodi_serie["tvdbid"] = tvdb_details["id"]
+                cont_series.append(kodi_serie)
+             
+    if USE_CACHE: 
+        simplecache.set("ContinuingKodiSeries",data=cont_series, checksum=len(kodi_series), expiration=timedelta(days=14))
+    return cont_series
+        
 def getKodiSeriesUnairedEpisodesList(singleEpisodePerShow=True):
     '''
         Returns the next unaired episode for all continuing tv shows in the Kodi library
         Defaults to a single episode (next unaired) for each show, to disable have False as argument.
     '''
-    kodi_series = getKodiJSON('VideoLibrary.GetTvShows','{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
+    kodi_series = getContinuingKodiSeries()
+    cacheStr = "KodiUnairedEpisodes.%s" %singleEpisodePerShow
+        
+    if USE_CACHE:
+        cache = simplecache.get(cacheStr,checksum=len(kodi_series))
+        if cache: return cache
     
-    #use primitive cache by using kodi window prop
-    cachestr = "tvdb-KodiUnairedEpisodes-%s-%s-%s-%s" %(date.today().strftime("%m%d%Y"),len(kodi_series),singleEpisodePerShow,DAYS_AHEAD)
-    cache = WINDOW.getProperty(cachestr)
-    if cache and USE_CACHE:
-        return eval(cache)
-    
+    #No cache - start lookup
     next_episodes = []
-    if kodi_series and kodi_series.get("tvshows"):
-        for kodi_serie in kodi_series["tvshows"]:
-            if kodi_serie["imdbnumber"] and kodi_serie["imdbnumber"].startswith("tt"):
-                #lookup serie by imdbid
-                search_serie = searchSeries(imdbid=kodi_serie["imdbnumber"])
-                serieid = search_serie[0]["id"]
-            elif kodi_serie["imdbnumber"]:
-                #imdbid in kodidb is already tvdb id
-                serieid = kodi_serie["imdbnumber"]
-            else:
-                #lookup series id by name
-                search_serie = searchSeries(title=kodi_serie["title"])
-                serieid = search_serie[0]["id"]
-            
-            episodes = []
-            if singleEpisodePerShow:
-                episodes.append( getNextUnAiredEpisode(serieid) )
-            else:
-                episodes = getUnAiredEpisodes(serieid)
-            for next_episode in episodes:
-                if next_episode:
-                    #make the json output kodi compatible
-                    next_episode["art"] = {}
-                    next_episode["art"]["thumb"] = next_episode.get("thumbnail","")
-                    next_episode["art"]["poster"] = next_episode.get("poster","")
-                    next_episode["art"]["landscape"] = kodi_serie["art"].get("landscape",next_episode["seriesinfo"].get("landscape",""))
-                    next_episode["art"]["fanart"] = kodi_serie["art"].get("fanart",next_episode["seriesinfo"].get("fanart",""))
-                    next_episode["art"]["banner"] = kodi_serie["art"].get("banner",next_episode["seriesinfo"].get("banner",""))
-                    next_episode["art"]["clearlogo"] = kodi_serie["art"].get("clearlogo","")
-                    next_episode["art"]["clearart"] = kodi_serie["art"].get("clearart","")
-                        
-                    next_episode["title"] = next_episode["episodeName"]
-                    next_episode["tvshowtitle"] = kodi_serie["title"]
-                    next_episode["studio"] = kodi_serie["studio"]
-                    next_episode["genre"] = kodi_serie["genre"]
-                    next_episode["cast"] = kodi_serie["cast"]
-                    next_episode["tvshowid"] = kodi_serie["tvshowid"]
-                    next_episode["season"] = next_episode["airedSeason"]
-                    next_episode["episode"] = next_episode["airedEpisodeNumber"]
-                    next_episode["episodeid"] = -1
-                    next_episode["file"] = "plugin://script.skin.helper.service?action=LAUNCH&path=ActivateWindow(Videos,videodb://tvshows/titles/%s/,return)" %kodi_serie["tvshowid"]
-                    next_episode["type"] = "episode"
-                    next_episode["firstaired"] = next_episode["firstAired"]
-                    next_episode["writer"] = next_episode["writers"]
-                    next_episode["director"] = [ next_episode["director"] ]
-                    next_episode["rating"] = next_episode["siteRating"]
-                    next_episode["plot"] = next_episode["overview"]
-                    next_episode["runtime"] = int(next_episode["seriesinfo"]["runtime"]) * 60
-                    next_episodes.append(next_episode)
+    for kodi_serie in kodi_series:
+
+        serieid = kodi_serie["tvdbid"]
+        
+        if singleEpisodePerShow:
+            episodes = [ getNextUnAiredEpisode(serieid) ]
+        else:
+            episodes = getUnAiredEpisodes(serieid)
+        for next_episode in episodes:
+            if next_episode:
+                #make the json output kodi compatible
+                next_episode["art"] = {}
+                next_episode["art"]["thumb"] = next_episode.get("thumbnail","")
+                next_episode["art"]["poster"] = next_episode.get("poster","")
+                next_episode["art"]["landscape"] = kodi_serie["art"].get("landscape",next_episode["seriesinfo"].get("landscape",""))
+                next_episode["art"]["fanart"] = kodi_serie["art"].get("fanart",next_episode["seriesinfo"].get("fanart",""))
+                next_episode["art"]["banner"] = kodi_serie["art"].get("banner",next_episode["seriesinfo"].get("banner",""))
+                next_episode["art"]["clearlogo"] = kodi_serie["art"].get("clearlogo","")
+                next_episode["art"]["clearart"] = kodi_serie["art"].get("clearart","")
+                    
+                next_episode["title"] = next_episode["episodeName"]
+                next_episode["label"] = "%sx%s. %s" %(next_episode["airedSeason"],next_episode["airedEpisodeNumber"],next_episode["episodeName"])
+                next_episode["tvshowtitle"] = kodi_serie["title"]
+                next_episode["studio"] = kodi_serie["studio"]
+                next_episode["genre"] = kodi_serie["genre"]
+                next_episode["cast"] = kodi_serie["cast"]
+                next_episode["tvshowid"] = kodi_serie["tvshowid"]
+                next_episode["season"] = next_episode["airedSeason"]
+                next_episode["episode"] = next_episode["airedEpisodeNumber"]
+                next_episode["episodeid"] = -1
+                next_episode["file"] = "plugin://script.skin.helper.service?action=LAUNCH&path=ActivateWindow(Videos,videodb://tvshows/titles/%s/,return)" %kodi_serie["tvshowid"]
+                next_episode["type"] = "episode"
+                next_episode["DBTYPE"] = "episode"
+                next_episode["firstaired"] = next_episode["firstAired"]
+                next_episode["writer"] = next_episode["writers"]
+                next_episode["director"] = [ next_episode["director"] ]
+                next_episode["rating"] = next_episode["siteRating"]
+                next_episode["plot"] = next_episode["overview"]
+                next_episode["runtime"] = int(next_episode["seriesinfo"]["runtime"]) * 60
+                next_episodes.append(next_episode)
              
     #return our list sorted by date
     next_episodes = sorted(next_episodes, key=lambda k: k.get('firstAired', ""))
-    WINDOW.setProperty(cachestr,repr(next_episodes).decode("utf-8"))
+    if USE_CACHE:
+        simplecache.set(cacheStr, data=next_episodes,checksum=len(kodi_series),expiration=CACHE_DEFAULT_EXPIRE_TIME)
     return next_episodes
         
