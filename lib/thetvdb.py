@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 import requests
-import xbmc, xbmcgui, xbmcaddon, xbmcvfs
-import time, re, os, base64
+import xbmc, xbmcgui, xbmcaddon
+import time, re, os
 from datetime import timedelta, date
 import datetime
-import unicodedata
 try:
     import simplejson as json
-except:
+except ImportError:
     import json
 import simplecache
 
@@ -23,14 +22,14 @@ simplecache.use_file_cache = True
 def logMsg(msg):
     if isinstance(msg,unicode):
         msg = msg.encode("utf-8")
-	xbmc.log('{0} - thetvdb: {1}'.format(ADDON_ID, try_encode(msg)))   
-    
+	xbmc.log('{0} - thetvdb: {1}'.format(ADDON_ID, try_encode(msg)))
+
 def getToken(refresh=False):
     #get token from memory cache first
     token = WINDOW.getProperty("script.module.thetvdb.token").decode('utf-8')
     if token and not refresh:
         return token
-    
+
     #refresh previous token
     prev_token = ADDON.getSetting("token")
     if prev_token:
@@ -43,7 +42,7 @@ def getToken(refresh=False):
         if token:
             WINDOW.setProperty("script.module.thetvdb.token",token)
             return token
-    
+
     #do first login to get initial token
     url = 'https://api.thetvdb.com/login'
     payload = {'apikey': 'A7613F5C1482A540'}
@@ -65,14 +64,14 @@ def getKodiJSON(method,params):
     if(jsonobject.has_key('result')):
         jsonobject = jsonobject['result']
     return jsonobject
-        
+
 def getData(endpoint, overrideCacheExpiration=CACHE_DEFAULT_EXPIRE_TIME):
-    
+
     #grab from cache first
     if USE_CACHE:
         cache = simplecache.get(endpoint)
         if cache: return cache
-        
+
     #grab the results from the api
     url = 'https://api.thetvdb.com/' + endpoint
     headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % getToken()}
@@ -87,9 +86,9 @@ def getData(endpoint, overrideCacheExpiration=CACHE_DEFAULT_EXPIRE_TIME):
         if response and response.content and response.status_code == 200:
             data = json.loads(response.content.decode('utf-8','replace'))
 
-    if data.get("data"): 
+    if data.get("data"):
         data = data["data"]
-        
+
     #store in cache and return our data
     if USE_CACHE:
         simplecache.set(endpoint, data, "", overrideCacheExpiration)
@@ -97,7 +96,7 @@ def getData(endpoint, overrideCacheExpiration=CACHE_DEFAULT_EXPIRE_TIME):
 
 def getSeriesPoster(seriesid,season=None):
     #retrieves the URL for the series poster, prefer season poster if season number provided
-    
+
     score = 0
     posterurl = ""
     if season:
@@ -107,7 +106,7 @@ def getSeriesPoster(seriesid,season=None):
             if image_score > score:
                 posterurl = "http://thetvdb.com/banners/" + image["fileName"]
                 score = image_score
-                
+
     if not posterurl:
         images = getData("series/%s/images/query?keyType=poster" %(seriesid),timedelta(days=60))
         for image in images:
@@ -115,12 +114,12 @@ def getSeriesPoster(seriesid,season=None):
             if image_score > score:
                 posterurl = "http://thetvdb.com/banners/" + image["fileName"]
                 score = image_score
-                
+
     return posterurl
-    
+
 def getSeriesFanart(seriesid,Landscape=False):
     #retrieves the URL for the series fanart image
-    
+
     score = 0
     fanarturl = ""
     images = getData("series/%s/images/query?keyType=fanart" %(seriesid),timedelta(days=60))
@@ -130,12 +129,12 @@ def getSeriesFanart(seriesid,Landscape=False):
             if image_score > score:
                 fanarturl = "http://thetvdb.com/banners/" + image["fileName"]
                 score = image_score
-                
+
     return fanarturl
-       
+
 def getEpisode(episodeid):
     '''
-        Returns the full information for a given episode id. 
+        Returns the full information for a given episode id.
         Deprecation Warning: The director key will be deprecated in favor of the new directors key in a future release.
         Usage: specify the episode ID: getEpisode(episodeid)
     '''
@@ -144,7 +143,7 @@ def getEpisode(episodeid):
         episode["thumbnail"] = "http://thetvdb.com/banners/" + episode["filename"]
     episode["poster"] = getSeriesPoster(episode["seriesId"],episode["airedSeason"])
     return episode
-        
+
 def getSeries(seriesid,ContinuingOnly=False):
     '''
         Returns a series record that contains all information known about a particular series id.
@@ -159,7 +158,7 @@ def getSeries(seriesid,ContinuingOnly=False):
     seriesinfo["fanart"] = getSeriesFanart(seriesid)
     seriesinfo["landscape"] = getSeriesFanart(seriesid,True)
     return seriesinfo
-    
+
 def getContinuingSeries():
     '''
         only gets the continuing series, based on which series were recently updated as there is no other api call to get that information
@@ -171,14 +170,14 @@ def getContinuingSeries():
         if seriesinfo:
             continuing_series.append(seriesinfo)
     return continuing_series
-        
+
 def getSeriesActors(seriesid):
     '''
         Returns actors for the given series id.
         Usage: specify the series ID: getSeriesActors(seriesid)
     '''
     return getData("series/%s/actors" %seriesid,timedelta(days=60))
-       
+
 def getSeriesEpisodes(seriesid):
     '''
         Returns all episodes for a given series.
@@ -195,7 +194,7 @@ def getSeriesEpisodes(seriesid):
             allepisodes += data
             page += 1
     return allepisodes
-    
+
 def getSeriesEpisodesByQuery(seriesid,absoluteNumber="",airedSeason="",airedEpisode="",dvdSeason="",dvdEpisode="",imdbId=""):
     '''
         This route allows the user to query against episodes for the given series. The response is an array of episode records that have been filtered down to basic information.
@@ -212,7 +211,7 @@ def getSeriesEpisodesByQuery(seriesid,absoluteNumber="",airedSeason="",airedEpis
     page = 1
     while True:
         #get all episodes by iterating over the pages
-        data = getData("series/%s/episodes/query?page=%s&absoluteNumber=%s&airedSeason=%s&airedEpisode=%s&dvdSeason=%s&dvdEpisode=%s&imdbId=%s" 
+        data = getData("series/%s/episodes/query?page=%s&absoluteNumber=%s&airedSeason=%s&airedEpisode=%s&dvdSeason=%s&dvdEpisode=%s&imdbId=%s"
             %(seriesid,page,absoluteNumber,airedSeason,airedEpisode,dvdSeason,dvdEpisode,imdbId) )
         if not data:
             break
@@ -220,7 +219,7 @@ def getSeriesEpisodesByQuery(seriesid,absoluteNumber="",airedSeason="",airedEpis
             allepisodes += data
             page += 1
     return allepisodes
-    
+
 def getSeriesEpisodesSummary(seriesid):
     '''
         Returns a summary of the episodes and seasons available for the series.
@@ -234,15 +233,15 @@ def searchSeries(name="",imdbId="",zap2itId=""):
     '''
         Allows the user to search for a series based on one or more parameters. Returns an array of results that match the query.
         Usage: specify the series ID: searchSeries(parameters)
-        
+
         Available parameters:
         name --> Name of the series to search for.
         imdbId --> IMDB id of the series
         zap2itId -->  Zap2it ID of the series to search for.
     '''
-    return getData("search/series?name=%s&imdbId=%s&zap2itId=%s" 
+    return getData("search/series?name=%s&imdbId=%s&zap2itId=%s"
         %(name,imdbid,zap2itId) )
-            
+
 def getRecentlyUpdatedSeries():
     '''
         Returns all series that have been updated in the last week
@@ -251,7 +250,7 @@ def getRecentlyUpdatedSeries():
     utc_date = date.today() - timedelta(days=7)
     cur_epoch = (utc_date.toordinal() - date(1970, 1, 1).toordinal()) * DAY
     return getData("updated/query?fromTime=%s" %cur_epoch)
-    
+
 def getUnAiredEpisodes(seriesid):
     '''
         Returns the unaired episodes for the specified seriesid
@@ -269,10 +268,10 @@ def getUnAiredEpisodes(seriesid):
                     episode = getEpisode(episode["id"])
                     episode["seriesinfo"] = seriesinfo
                     next_episodes.append(episode)
-                
+
     #return our list sorted by date
     return sorted(next_episodes, key=lambda k: k.get('firstAired', ""))
-    
+
 def getNextUnAiredEpisode(seriesid):
     '''
         Returns the first next airing episode for the specified seriesid
@@ -294,41 +293,41 @@ def getUnAiredEpisodeList(seriesids):
         episodes = getUnAiredEpisodes(seriesid)
         if episodes:
             next_episodes.append(episodes[0])
-                
+
     #return our list sorted by date
     return sorted(next_episodes, key=lambda k: k.get('firstAired', ""))
 
 def getContinuingKodiSeries():
     kodi_series = getKodiJSON('VideoLibrary.GetTvShows','{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
-    
+
     if USE_CACHE:
         cache = simplecache.get("ContinuingKodiSeries",checksum=len(kodi_series))
         if cache: return cache
-    
+
     cont_series = []
     if kodi_series and kodi_series.get("tvshows"):
         for kodi_serie in kodi_series["tvshows"]:
             tvdb_details = None
             if kodi_serie["imdbnumber"] and kodi_serie["imdbnumber"].startswith("tt"):
                 #lookup serie by imdbid
-                result = searchSeries(imdbid=kodi_serie["imdbnumber"])
+                result = searchSeries(imdbId=kodi_serie["imdbnumber"])
                 if result: tvdb_details = result[0]
             elif kodi_serie["imdbnumber"]:
                 #imdbid in kodidb is already tvdb id
                 tvdb_details = getSeries(kodi_serie["imdbnumber"],True)
             else:
                 #lookup series id by name
-                result = searchSeries(title=kodi_serie["title"])
+                result = searchSeries(name=kodi_serie["title"])
                 if result: tvdb_details = search_serie[0]
-                
+
             if tvdb_details and tvdb_details["status"] == "Continuing":
                 kodi_serie["tvdbid"] = tvdb_details["id"]
                 cont_series.append(kodi_serie)
-             
-    if USE_CACHE: 
+
+    if USE_CACHE:
         simplecache.set("ContinuingKodiSeries",data=cont_series, checksum=len(kodi_series), expiration=timedelta(days=14))
     return cont_series
-        
+
 def getKodiSeriesUnairedEpisodesList(singleEpisodePerShow=True):
     '''
         Returns the next unaired episode for all continuing tv shows in the Kodi library
@@ -336,17 +335,17 @@ def getKodiSeriesUnairedEpisodesList(singleEpisodePerShow=True):
     '''
     kodi_series = getContinuingKodiSeries()
     cacheStr = "KodiUnairedEpisodes.%s" %singleEpisodePerShow
-        
+
     if USE_CACHE:
         cache = simplecache.get(cacheStr,checksum=len(kodi_series))
         if cache: return cache
-    
+
     #No cache - start lookup
     next_episodes = []
     for kodi_serie in kodi_series:
 
         serieid = kodi_serie["tvdbid"]
-        
+
         if singleEpisodePerShow:
             episodes = [ getNextUnAiredEpisode(serieid) ]
         else:
@@ -362,7 +361,7 @@ def getKodiSeriesUnairedEpisodesList(singleEpisodePerShow=True):
                 next_episode["art"]["banner"] = kodi_serie["art"].get("banner",next_episode["seriesinfo"].get("banner",""))
                 next_episode["art"]["clearlogo"] = kodi_serie["art"].get("clearlogo","")
                 next_episode["art"]["clearart"] = kodi_serie["art"].get("clearart","")
-                    
+
                 next_episode["title"] = next_episode["episodeName"]
                 next_episode["label"] = "%sx%s. %s" %(next_episode["airedSeason"],next_episode["airedEpisodeNumber"],next_episode["episodeName"])
                 next_episode["tvshowtitle"] = kodi_serie["title"]
@@ -383,10 +382,9 @@ def getKodiSeriesUnairedEpisodesList(singleEpisodePerShow=True):
                 next_episode["plot"] = next_episode["overview"]
                 next_episode["runtime"] = int(next_episode["seriesinfo"]["runtime"]) * 60
                 next_episodes.append(next_episode)
-             
+
     #return our list sorted by date
     next_episodes = sorted(next_episodes, key=lambda k: k.get('firstAired', ""))
     if USE_CACHE:
         simplecache.set(cacheStr, data=next_episodes,checksum=len(kodi_series),expiration=CACHE_DEFAULT_EXPIRE_TIME)
     return next_episodes
-        
