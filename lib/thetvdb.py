@@ -1,9 +1,16 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
+
+'''
+    Kodi Helper Module for accessing TheTvDb API
+    Includes the most common actions including a few special ones for Kodi use
+    Full series and episode data is mapped into Kodi compatible format
+'''
 import requests
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 import xbmc, xbmcgui, xbmcaddon
-import time, re, os
+import re, os
 from datetime import timedelta, date
 from operator import itemgetter
 import datetime
@@ -15,16 +22,16 @@ from simplecache import use_cache
 
 #set some parameters to the requests module
 requests.packages.urllib3.disable_warnings()
-s = requests.Session()
-retries = Retry(total=5, backoff_factor=2, status_forcelist=[ 500, 502, 503, 504 ])
-s.mount('http://', HTTPAdapter(max_retries=retries))
-s.mount('https://', HTTPAdapter(max_retries=retries))
+SES = requests.Session()
+RETRIES = Retry(total=5, backoff_factor=2, status_forcelist=[ 500, 502, 503, 504 ])
+SES.mount('http://', HTTPAdapter(max_retries=RETRIES))
+SES.mount('https://', HTTPAdapter(max_retries=RETRIES))
 
 ADDON_ID = "script.module.thetvdb"
 KODI_LANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
 
 class TheTvDb(object):
-
+    '''Our main class'''
     days_ahead = 120
     win = None
     addon = None
@@ -74,7 +81,6 @@ class TheTvDb(object):
     @use_cache(60)
     def get_series_posters(self, seriesid, season=None):
         '''retrieves the URL for the series poster, prefer season poster if season number provided'''
-        result = []
         if season:
             images = self.get_data("series/%s/images/query?keyType=season&subKey=%s" %(seriesid,season))
         else:
@@ -84,13 +90,12 @@ class TheTvDb(object):
     @use_cache(60)
     def get_series_fanarts(self, seriesid, landscape=False):
         '''retrieves the URL for the series fanart image'''
-        result = []
         if landscape:
             images = self.get_data("series/%s/images/query?keyType=fanart&subKey=text" %(seriesid))
         else:
             images = self.get_data("series/%s/images/query?keyType=fanart&subKey=graphical" %(seriesid))
         return self.process_images(images)
-    
+
     @staticmethod
     def process_images(images):
         '''helper to sort and correct the images as the api output is rather messy'''
@@ -104,7 +109,7 @@ class TheTvDb(object):
                     image["score"] = image_score
                     result.append(image)
         return [item["fileName"] for item in sorted(result,key=itemgetter("score"),reverse=True)]
-        
+
     @use_cache(7)
     def get_episode(self, episodeid):
         '''
@@ -179,11 +184,11 @@ class TheTvDb(object):
                 allepisodes += data
                 page += 1
         return allepisodes
-        
+
     def get_last_season_for_series(self, seriesid):
         '''get the last season for the series'''
-        summary = self.get_series_episodes_summary(seriesid)
         highest_season = 0
+        summary = self.get_series_episodes_summary(seriesid)
         if summary:
             for season in summary["airedSeasons"]:
                 if int(season) > highest_season:
@@ -216,7 +221,7 @@ class TheTvDb(object):
         return None
 
     @use_cache(7)
-    def get_series_episodes_by_query(self, seriesid, query="absoluteNumber=&airedSeason=&airedEpisode=&dvdSeason=&dvdEpisode=&imdbId=%s"):
+    def get_series_episodes_by_query(self, seriesid, query=""):
         '''
             This route allows the user to query against episodes for the given series.
             The response is an array of episode records that have been filtered down to basic information.
@@ -252,9 +257,9 @@ class TheTvDb(object):
         return self.get_data("series/%s/episodes/summary" %(seriesid))
 
     @use_cache(30)
-    def search_series(self, name="", prefer_localized=False):
+    def search_series(self, query="", prefer_localized=False):
         '''
-            Allows the user to search for a series based the name. 
+            Allows the user to search for a series based the name.
             Returns an array of results that match the query.
             Usage: specify the series ID: TheTvDb().search_series(searchphrase)
 
@@ -268,9 +273,9 @@ class TheTvDb(object):
         '''
             Returns all series that have been updated in the last week
         '''
-        DAY = 24*60*60
+        day = 24*60*60
         utc_date = date.today() - timedelta(days=7)
-        cur_epoch = (utc_date.toordinal() - date(1970, 1, 1).toordinal()) * DAY
+        cur_epoch = (utc_date.toordinal() - date(1970, 1, 1).toordinal()) * day
         return self.get_data("updated/query?fromTime=%s" %cur_epoch)
 
     @use_cache(7)
@@ -334,7 +339,7 @@ class TheTvDb(object):
                     tvdb_details = self.get_series_by_imdb_id(kodi_serie["imdbnumber"])
                 elif kodi_serie["imdbnumber"]:
                     #imdbid in kodidb is already tvdb id
-                    tvdb_details = self.get_series(kodi_serie["imdbnumber"],True)
+                    tvdb_details = self.get_series(kodi_serie["imdbnumber"])
                 if not tvdb_details:
                     #lookup series id by name
                     result = self.search_series(name=kodi_serie["title"])
@@ -345,7 +350,7 @@ class TheTvDb(object):
                     cont_series.append(kodi_serie)
         return cont_series
 
-    def get_kodi_series_unaired_episodes_list(self, single_episode_per_show=True):
+    def get_kodi_unaired_episodes(self, single_episode_per_show=True):
         '''
             Returns the next unaired episode for all continuing tv shows in the Kodi library
             Defaults to a single episode (next unaired) for each show, to disable have False as argument.
@@ -494,6 +499,6 @@ class TheTvDb(object):
         json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }'
             %(method, params.encode("utf-8")))
         jsonobject = json.loads(json_response.decode('utf-8','replace'))
-        if(jsonobject.has_key('result')):
+        if jsonobject.has_key('result'):
             jsonobject = jsonobject['result']
         return jsonobject
