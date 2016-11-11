@@ -12,8 +12,6 @@ from requests.adapters import HTTPAdapter
 import xbmc
 import xbmcgui
 import xbmcaddon
-import re
-import os
 from datetime import timedelta, date
 from operator import itemgetter
 try:
@@ -200,7 +198,6 @@ class TheTvDb(object):
             Returns the last aired episode for a given series
             Usage: specify the series ID: TheTvDb().get_last_episode_for_series(seriesid)
         '''
-        summary = self.get_series_episodes_summary(seriesid)
         # somehow the absolutenumber is broken in the api so we have to get this info the hard way
         highest_season = self.get_last_season_for_series(seriesid)
         while not highest_season == -1:
@@ -342,7 +339,7 @@ class TheTvDb(object):
                     tvdb_details = self.get_series(kodi_serie["imdbnumber"])
                 if not tvdb_details:
                     # lookup series id by name
-                    result = self.search_series(name=kodi_serie["title"])
+                    result = self.search_series(kodi_serie["title"])
                     if result:
                         tvdb_details = result[0]
                 if tvdb_details and tvdb_details["status"] == "Continuing":
