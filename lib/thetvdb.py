@@ -546,18 +546,26 @@ class TheTvDb(object):
     def get_local_time(timestr):
         '''returns the correct localized representation of the time provided by the api'''
         result = ""
-        if timestr:
-            timestr = timestr.replace(".", ":")
-            if "H" in xbmc.getRegion('time'):
-                time_format = "HH:mm"
-            else:
-                time_format = "h:mm A"
-            if "AM" in timestr or "PM" in timestr:
-                result = arrow.get(timestr, 'h:mm A').format(time_format, locale=KODI_LANGUAGE)
-            elif "am" in timestr or "pm" in timestr:
-                result = arrow.get(timestr, 'h:mm a').format(time_format, locale=KODI_LANGUAGE)
-            else:
-                result = arrow.get(timestr, 'HH:mm').format(time_format, locale=KODI_LANGUAGE)
+        try:
+            if timestr:
+                timestr = timestr.replace(".", ":")
+                if "H" in xbmc.getRegion('time'):
+                    time_format = "HH:mm"
+                else:
+                    time_format = "h:mm A"
+                if " AM" in timestr or " PM" in timestr:
+                    result = arrow.get(timestr, 'h:mm A').format(time_format, locale=KODI_LANGUAGE)
+                elif " am" in timestr or " pm" in timestr:
+                    result = arrow.get(timestr, 'h:mm a').format(time_format, locale=KODI_LANGUAGE)
+                elif "AM" in timestr or "PM" in timestr:
+                    result = arrow.get(timestr, 'h:mmA').format(time_format, locale=KODI_LANGUAGE)
+                elif "am" in timestr or "pm" in timestr:
+                    result = arrow.get(timestr, 'h:mma').format(time_format, locale=KODI_LANGUAGE)
+                else:
+                    result = arrow.get(timestr, 'HH:mm').format(time_format, locale=KODI_LANGUAGE)
+        except Exception as exc:
+            self.log_msg(str(exc), xbmc.LOGWARNING)
+            return timestr
         return result
 
     @staticmethod
