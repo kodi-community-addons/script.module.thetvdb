@@ -396,6 +396,7 @@ class TheTvDb(object):
             result["studio"] = seriesdetails["studio"]
             result["genre"] = seriesdetails["genre"]
             result["airtime"] = seriesdetails["airtime"]
+            result["airday"] = seriesdetails["airday"]
             result["airdatetime"] = "%s %s" % (result["airdate"], result["airtime"])
             result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
                                                           xbmc.getLocalizedString(145), result["network"])
