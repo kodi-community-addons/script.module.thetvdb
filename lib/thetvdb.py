@@ -581,7 +581,11 @@ class TheTvDb(object):
         '''returns the localized representation of the weekday provided by the api'''
         if not weekday:
             return weekday
-        elif short:
-            return arrow.get(weekday, 'dddd').format('ddd', locale=KODI_LANGUAGE).capitalize()
-        else:
-            return arrow.get(weekday, 'dddd').format('dddd', locale=KODI_LANGUAGE).capitalize()
+        try:
+            if short:
+                return arrow.get(weekday, 'dddd').format('ddd', locale=KODI_LANGUAGE).capitalize()
+            else:
+                return arrow.get(weekday, 'dddd').format('dddd', locale=KODI_LANGUAGE).capitalize()
+        except Exception:
+            pass
+        return arrow.get(weekday, 'dddd').format('dddd').capitalize()
