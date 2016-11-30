@@ -543,8 +543,7 @@ class TheTvDb(object):
             jsonobject = jsonobject['result']
         return jsonobject
 
-    @staticmethod
-    def get_local_time(timestr):
+    def get_local_time(self, timestr):
         '''returns the correct localized representation of the time provided by the api'''
         result = ""
         try:
