@@ -57,24 +57,27 @@ class TheTvDb(object):
     @use_cache(2)
     def get_data(self, endpoint, prefer_localized=False):
         '''grab the results from the api'''
+        data = {}
         url = 'https://api.thetvdb.com/' + endpoint
         headers = {'Content-Type': 'application/json',
                    'Accept': 'application/json',
                    'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % self.get_token()}
         if prefer_localized:
             headers["Accept-Language"] = KODI_LANGUAGE
-        response = requests.get(url, headers=headers, timeout=20)
-        data = {}
-        if response and response.content and response.status_code == 200:
-            data = json.loads(response.content.decode('utf-8', 'replace'))
-        elif response.status_code == 401:
-            # token expired, refresh it and repeat our request
-            headers['Bearer'] = self.get_token(True)
-            response = requests.get(url, headers=headers, timeout=5)
+        try:
+            response = requests.get(url, headers=headers, timeout=20)
             if response and response.content and response.status_code == 200:
                 data = json.loads(response.content.decode('utf-8', 'replace'))
-        if data.get("data"):
-            data = data["data"]
+            elif response.status_code == 401:
+                # token expired, refresh it and repeat our request
+                headers['Bearer'] = self.get_token(True)
+                response = requests.get(url, headers=headers, timeout=5)
+                if response and response.content and response.status_code == 200:
+                    data = json.loads(response.content.decode('utf-8', 'replace'))
+            if data.get("data"):
+                data = data["data"]
+        except Exception as exc:
+            self.log_msg("Exception in get_data --> %s" % repr(exc), xbmc.LOGERROR)
         return data
 
     @use_cache(60)
