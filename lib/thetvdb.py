@@ -449,8 +449,9 @@ class TheTvDb(object):
             result["tvdb_id"] = showdetails["id"]
             result["network"] = showdetails["network"]
             result["studio"] = [showdetails["network"]]
-            result["airday"] = self.get_local_weekday(showdetails["airsDayOfWeek"])
-            result["airday.short"] = self.get_local_weekday(showdetails["airsDayOfWeek"], True)
+            local_airday, local_airday_short = self.get_local_weekday(showdetails["airsDayOfWeek"])
+            result["airday"] = local_airday
+            result["airday.short"] = local_airday_short
             result["airtime"] = self.get_local_time(showdetails["airsTime"])
             result["airdaytime"] = "%s %s (%s)" % (result["airday"], result["airtime"], result["network"])
             result["airdaytime.short"] = "%s %s" % (result["airday.short"], result["airtime"])
@@ -578,16 +579,20 @@ class TheTvDb(object):
             return datestr
         return arrow.get(datestr).strftime(xbmc.getRegion('dateshort'))
 
-    @staticmethod
-    def get_local_weekday(weekday, short=False):
+    def get_local_weekday(self, weekday):
         '''returns the localized representation of the weekday provided by the api'''
         if not weekday:
             return weekday
+        day_name = weekday
+        day_name_short = day_name[:3]
         try:
-            if short:
-                return arrow.get(weekday, 'dddd').format('ddd', locale=KODI_LANGUAGE).capitalize()
-            else:
-                return arrow.get(weekday, 'dddd').format('dddd', locale=KODI_LANGUAGE).capitalize()
-        except Exception:
-            pass
-        return arrow.get(weekday, 'dddd').format('dddd').capitalize()
+            locale = arrow.locales.get_locale(KODI_LANGUAGE)
+            day_names = { "monday": 1, "tuesday": 2, "wednesday": 3, "thurday": 4,
+                "friday": 5, "saturday": 6, "sunday": 7}
+            day_int = day_names.get(weekday.lower())
+            if day_int:
+                day_name = locale.day_name(day_int).capitalize()
+                day_name_short = locale.day_abbreviation(day_int).capitalize()
+        except Exception as exc:
+            self.log_msg(str(exc), xbmc.LOGWARNING)
+        return (day_name, day_name_short)
