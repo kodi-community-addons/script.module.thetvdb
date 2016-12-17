@@ -582,7 +582,7 @@ class TheTvDb(object):
     def get_local_weekday(self, weekday):
         '''returns the localized representation of the weekday provided by the api'''
         if not weekday:
-            return weekday
+            return ("", "")
         day_name = weekday
         day_name_short = day_name[:3]
         try:
