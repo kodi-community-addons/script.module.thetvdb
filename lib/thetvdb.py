@@ -294,7 +294,7 @@ class TheTvDb(object):
             for episode in episodes:
                 if episode["firstAired"] and episode["episodeName"]:
                     airdate = arrow.get(episode["firstAired"]).date()
-                    if airdate >= date.today() and (airdate < (date.today() + timedelta(days=self.days_ahead))):
+                    if airdate >= date.today() and (airdate <= (date.today() + timedelta(days=self.days_ahead))):
                         # if airdate is today or (max X days) in the future add to our list
                         episode = self.get_episode(episode["id"], seriesinfo)
                         next_episodes.append(episode)
