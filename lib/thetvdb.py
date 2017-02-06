@@ -30,6 +30,7 @@ SES.mount('https://', HTTPAdapter(max_retries=RETRIES))
 
 ADDON_ID = "script.module.thetvdb"
 KODI_LANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
+KODI_VERSION = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
 
 
 class TheTvDb(object):
@@ -263,7 +264,7 @@ class TheTvDb(object):
         '''
             Allows the user to search for a series based the name.
             Returns an array of results that match the query.
-            Usage: specify the series ID: TheTvDb().search_series(searchphrase)
+            Usage: specify the query: TheTvDb().search_series(searchphrase)
 
             Available parameter:
             prefer_localized --> True if you want to set the current kodi language as preferred in the results
@@ -328,7 +329,11 @@ class TheTvDb(object):
 
     def get_continuing_kodi_series(self):
         '''iterates all tvshows in the kodi library to find returning series'''
-        kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows',
+        if KODI_VERSION > 16:
+            kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows',
+                '{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio", "uniqueid" ] }')
+        else:
+            kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows',
                                          '{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
         cont_series = []
         if kodi_series and kodi_series.get("tvshows"):
@@ -338,13 +343,22 @@ class TheTvDb(object):
                     # lookup serie by imdbid
                     tvdb_details = self.get_series_by_imdb_id(kodi_serie["imdbnumber"])
                 elif kodi_serie["imdbnumber"]:
-                    # imdbid in kodidb is already tvdb id
+                    # assume imdbid in kodidb is already tvdb id
                     tvdb_details = self.get_series(kodi_serie["imdbnumber"])
+                elif "uniqueid" in kodi_serie:
+                    # kodi 17+ uses the uniqueid field to store the imdb/tvdb number
+                    for value in kodi_serie["uniqueid"]:
+                        if value.startswith("tt"):
+                            tvdb_details = self.get_series_by_imdb_id(value)
+                            break
+                        elif value:
+                            tvdb_details = self.get_series(value)  
                 if not tvdb_details:
                     # lookup series id by name
                     result = self.search_series(kodi_serie["title"])
                     if result:
                         tvdb_details = result[0]
+                        tvdb_details["tvdb_id"] = result["id"]
                 if tvdb_details and tvdb_details["status"] == "Continuing":
                     kodi_serie["tvdb_id"] = tvdb_details["tvdb_id"]
                     cont_series.append(kodi_serie)
