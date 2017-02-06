@@ -330,11 +330,12 @@ class TheTvDb(object):
     def get_continuing_kodi_series(self):
         '''iterates all tvshows in the kodi library to find returning series'''
         if KODI_VERSION > 16:
-            kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows',
+            kodi_series = self.get_kodi_json(
+                'VideoLibrary.GetTvShows',
                 '{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio", "uniqueid" ] }')
         else:
             kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows',
-                                         '{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
+                                             '{"properties": [ "title","imdbnumber","art", "genre", "cast", "studio" ] }')
         cont_series = []
         if kodi_series and kodi_series.get("tvshows"):
             for kodi_serie in kodi_series["tvshows"]:
@@ -352,13 +353,13 @@ class TheTvDb(object):
                             tvdb_details = self.get_series_by_imdb_id(value)
                             break
                         elif value:
-                            tvdb_details = self.get_series(value)  
+                            tvdb_details = self.get_series(value)
                 if not tvdb_details:
                     # lookup series id by name
                     result = self.search_series(kodi_serie["title"])
                     if result:
                         tvdb_details = result[0]
-                        tvdb_details["tvdb_id"] = result["id"]
+                        tvdb_details["tvdb_id"] = tvdb_details["id"]
                 if tvdb_details and tvdb_details["status"] == "Continuing":
                     kodi_serie["tvdb_id"] = tvdb_details["tvdb_id"]
                     cont_series.append(kodi_serie)
@@ -601,8 +602,8 @@ class TheTvDb(object):
         day_name_short = day_name[:3]
         try:
             locale = arrow.locales.get_locale(KODI_LANGUAGE)
-            day_names = { "monday": 1, "tuesday": 2, "wednesday": 3, "thurday": 4,
-                "friday": 5, "saturday": 6, "sunday": 7}
+            day_names = {"monday": 1, "tuesday": 2, "wednesday": 3, "thurday": 4,
+                         "friday": 5, "saturday": 6, "sunday": 7}
             day_int = day_names.get(weekday.lower())
             if day_int:
                 day_name = locale.day_name(day_int).capitalize()
