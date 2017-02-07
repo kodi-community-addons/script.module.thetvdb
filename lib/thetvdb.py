@@ -351,9 +351,10 @@ class TheTvDb(object):
                     for value in kodi_serie["uniqueid"]:
                         if value.startswith("tt"):
                             tvdb_details = self.get_series_by_imdb_id(value)
-                            break
                         elif value:
                             tvdb_details = self.get_series(value)
+                        if tvdb_details:
+                            break
                 if not tvdb_details:
                     # lookup series id by name
                     result = self.search_series(kodi_serie["title"])
@@ -389,7 +390,7 @@ class TheTvDb(object):
         '''maps full episode data from tvdb to kodi compatible format'''
         result = {}
         result["art"] = {}
-        if episode_details["filename"]:
+        if episode_details.get("filename"):
             result["art"]["thumb"] = "http://thetvdb.com/banners/" + episode_details["filename"]
             result["thumbnail"] = result["art"]["thumb"]
         result["art"] = {}
