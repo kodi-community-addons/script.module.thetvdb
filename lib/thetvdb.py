@@ -121,9 +121,11 @@ class TheTvDb(object):
         '''
         episode = self.get_data("episodes/%s" % episodeid, True)
         # we prefer localized content but if that fails, fallback to default
-        if not episode.get("overview"):
+        if episode and not episode.get("overview"):
             episode = self.get_data("episodes/%s" % episodeid)
-        return self.map_episode_data(episode, seriesdetails)
+        if episode:
+            episode = self.map_episode_data(episode, seriesdetails)
+        return episode
 
     @use_cache(14)
     def get_series(self, seriesid):
@@ -298,7 +300,8 @@ class TheTvDb(object):
                     if airdate >= date.today() and (airdate <= (date.today() + timedelta(days=self.days_ahead))):
                         # if airdate is today or (max X days) in the future add to our list
                         episode = self.get_episode(episode["id"], seriesinfo)
-                        next_episodes.append(episode)
+                        if episode: #apparently some episode id's are reported that do not exist
+                            next_episodes.append(episode)
 
         # return our list sorted by episode
         return sorted(next_episodes, key=lambda k: k.get('episode', ""))
