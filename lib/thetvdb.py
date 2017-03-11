@@ -407,6 +407,9 @@ class TheTvDb(object):
         result["director"] = episode_details["directors"]
         result["gueststars"] = episode_details["guestStars"]
         result["rating"] = episode_details["siteRating"]
+        # make sure we have a decimal in the rating
+        if len(str(result["rating"])) == 1:
+            result["rating"] = "%s.0" % result["rating"]
         result["plot"] = episode_details["overview"]
         result["airdate"] = self.get_local_date(episode_details["firstAired"])
         result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
@@ -483,9 +486,12 @@ class TheTvDb(object):
                 result["airtime"],
                 xbmc.getLocalizedString(145),
                 result["network"])
-            result["rating"] = showdetails["siteRating"]
             result["votes"] = showdetails["siteRatingCount"]
             result["rating.tvdb"] = showdetails["siteRating"]
+            # make sure we have a decimal in the rating
+            if len(str(result["rating.tvdb"])) == 1:
+                result["rating.tvdb"] = "%s.0" % result["rating.tvdb"]
+            result["rating"] = result["rating.tvdb"]
             result["votes.tvdb"] = showdetails["siteRatingCount"]
             try:
                 result["runtime"] = int(showdetails["runtime"]) * 60
