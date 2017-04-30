@@ -300,7 +300,7 @@ class TheTvDb(object):
                     if airdate >= date.today() and (airdate <= (date.today() + timedelta(days=self.days_ahead))):
                         # if airdate is today or (max X days) in the future add to our list
                         episode = self.get_episode(episode["id"], seriesinfo)
-                        if episode: #apparently some episode id's are reported that do not exist
+                        if episode:  # apparently some episode id's are reported that do not exist
                             next_episodes.append(episode)
 
         # return our list sorted by episode
@@ -412,6 +412,7 @@ class TheTvDb(object):
             result["rating"] = "%s.0" % result["rating"]
         result["plot"] = episode_details["overview"]
         result["airdate"] = self.get_local_date(episode_details["firstAired"])
+        result["airdate.long"] = self.get_local_date(episode_details["firstAired"], True)
         result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
         # append seriesinfo to details if provided
         if seriesdetails:
@@ -598,11 +599,17 @@ class TheTvDb(object):
         return result
 
     @staticmethod
-    def get_local_date(datestr):
+    def get_local_date(datestr, long_date=False):
         '''returns the localized representation of the date provided by the api'''
-        if not datestr:
-            return datestr
-        return arrow.get(datestr).strftime(xbmc.getRegion('dateshort'))
+        result = ""
+        try:
+            if long_date:
+                result = arrow.get(datestr).strftime(xbmc.getRegion('datelong'))
+            else:
+                result = arrow.get(datestr).strftime(xbmc.getRegion('dateshort'))
+        except Exception as exc:
+            log_msg("Exception in get_local_date: %s" % exc)
+        return result
 
     def get_local_weekday(self, weekday):
         '''returns the localized representation of the weekday provided by the api'''
