@@ -15,10 +15,11 @@ Just make sure to import it within your addon.xml:
 ```
 
 Now, to use it in your Kodi addon/script, make sure to import it and you can access it's methods.
+Note that you will have to register at TVDB for an api key for your addon.
 
 ```
 from thetvdb import TheTvDb
-tvdb = TheTvDb()
+tvdb = TheTvDb(api_key=YOURAPIKEYFORTVDB)
 next_aired_episodes = tvdb.get_kodi_unaired_episodes(single_episode_per_show=False)
 for episode in next_aired_episodes:
     #do your stuff here, like creating listitems for all episodes that are returned.

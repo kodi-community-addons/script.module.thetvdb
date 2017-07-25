@@ -35,24 +35,25 @@ KODI_VERSION = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
 
 class TheTvDb(object):
     '''Our main class'''
+    _win = None
+    _addon = None
+    api_key = 'A7613F5C1482A540' # default api key
     days_ahead = 120
-    win = None
-    addon = None
-    api_key = 'A7613F5C1482A540'
 
-    def __init__(self):
+    def __init__(self, api_key=None):
         '''Initialize our Module'''
-
+        if api_key:
+            api_key = api_key
         self.cache = SimpleCache()
-        self.win = xbmcgui.Window(10000)
-        self.addon = xbmcaddon.Addon(ADDON_ID)
+        self._win = xbmcgui.Window(10000)
+        self._addon = xbmcaddon.Addon(ADDON_ID)
         self.log_msg("Initialized")
 
     def close(self):
         '''Cleanup Kodi cpython classes'''
         self.cache.close()
-        del self.win
-        del self.addon
+        del self._win
+        del self._addon
         self.log_msg("Exited")
 
     @use_cache(2)
@@ -530,12 +531,12 @@ class TheTvDb(object):
     def get_token(self, refresh=False):
         '''get jwt token for api'''
         # get token from memory cache first
-        token = self.win.getProperty("script.module.thetvdb.token").decode('utf-8')
+        token = self._win.getProperty("script.module.thetvdb.token").decode('utf-8')
         if token and not refresh:
             return token
 
         # refresh previous token
-        prev_token = self.addon.getSetting("token")
+        prev_token = self._addon.getSetting("token")
         if prev_token:
             url = 'https://api.thetvdb.com/refresh_token'
             headers = {'Content-Type': 'application/json', 'Accept': 'application/json',
@@ -545,7 +546,7 @@ class TheTvDb(object):
                 data = json.loads(response.content.decode('utf-8', 'replace'))
                 token = data["token"]
             if token:
-                self.win.setProperty("script.module.thetvdb.token", token)
+                self._win.setProperty("script.module.thetvdb.token", token)
                 return token
 
         # do first login to get initial token
@@ -556,8 +557,8 @@ class TheTvDb(object):
         if response and response.content and response.status_code == 200:
             data = json.loads(response.content.decode('utf-8', 'replace'))
             token = data["token"]
-            self.addon.setSetting("token", token)
-            self.win.setProperty("script.module.thetvdb.token", token)
+            self._addon.setSetting("token", token)
+            self._win.setProperty("script.module.thetvdb.token", token)
             return token
         else:
             self.log_msg("Error getting JWT token!")
