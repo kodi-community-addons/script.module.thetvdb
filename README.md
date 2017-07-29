@@ -134,8 +134,16 @@ If any images are found, they will also be present in the result (thumb, poster,
     Usage: get_unaired_episode_list([list [] of seriesids)
 ```
 
-###get_continuing_kodi_series(single_episode_per_show=True):
+
+###get_continuing_kodi_series():
+```
+    Returns a listing of all Kodi tvshows that are continuing
+```
+
+
+###get_kodi_unaired_episodes(single_episode_per_show=True):
 ```
     Returns the next unaired episode for all continuing tv shows in the Kodi library
     Defaults to a single episode (next unaired) for each show, to disable have False as argument.
 ```
+
