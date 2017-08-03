@@ -1,4 +1,7 @@
 # script.module.thetvdb
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b4a1cd468c2c4511bebdc3d81271e6ec)](https://www.codacy.com/app/m-vanderveldt/script-module-thetvdb?utm_source=github.com&utm_medium=referral&utm_content=marcelveldt/script.module.thetvdb&utm_campaign=badger)
+
 Kodi python module to access the new thetvdb api v2
 
 The module is supported by the simplecache module to ensure that data is not useless retrieved from the API all the time.
