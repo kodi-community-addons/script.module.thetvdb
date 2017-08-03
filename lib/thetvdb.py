@@ -21,6 +21,7 @@ except ImportError:
 from simplecache import use_cache, SimpleCache
 import arrow
 import urllib
+import re
 
 # set some parameters to the requests module
 requests.packages.urllib3.disable_warnings()
@@ -33,9 +34,11 @@ ADDON_ID = "script.module.thetvdb"
 KODI_LANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
 KODI_VERSION = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
 if KODI_VERSION > 16:
-    KODI_TV_PROPS = '"title","imdbnumber","art", "genre", "cast", "studio", "uniqueid"'
+    KODI_TV_PROPS = '"file", "title", "year", "imdbnumber", "art", "genre", "cast", "studio", "uniqueid"'
 else:
-    KODI_TV_PROPS = '"title","imdbnumber","art", "genre", "cast", "studio"'
+    KODI_TV_PROPS = '"file", "title", "year", "imdbnumber", "art", "genre", "cast", "studio"'
+CLASSIFICATION_REGEX = re.compile(
+    r"(?:^| \| )(Scripted|Mini-Series|Documentary|Animation|Game Show|Reality|Talk Show|Variety)( \| |$)")
 
 
 class TheTvDb(object):
@@ -43,6 +46,7 @@ class TheTvDb(object):
     _win = None
     _addon = None
     _token = None
+    cache = None
     api_key = 'A7613F5C1482A540'  # default api key
     days_ahead = 120
     ignore_cache = False
@@ -55,7 +59,9 @@ class TheTvDb(object):
         self.cache = SimpleCache()
         self._win = xbmcgui.Window(10000)
         self._addon = xbmcaddon.Addon(ADDON_ID)
-        self.log_msg("Initialized")
+        addonversion = self._addon.getAddonInfo('version').decode("utf-8")
+        self.cache.global_checksum = addonversion
+        self._log_msg("Initialized")
 
     def close(self):
         '''Cleanup Kodi cpython classes'''
@@ -63,21 +69,20 @@ class TheTvDb(object):
         self.cache.close()
         del self._win
         del self._addon
-        self.log_msg("Exited")
+        self._log_msg("Exited")
 
     def __del__(self):
         '''make sure close is called'''
         if not self._close_called:
             self.close()
-    
-    @use_cache(2)
+
     def get_data(self, endpoint, prefer_localized=False):
         '''grab the results from the api'''
         data = {}
         url = 'https://api.thetvdb.com/' + endpoint
         headers = {'Content-Type': 'application/json',
                    'Accept': 'application/json',
-                   'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % self.get_token()}
+                   'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % self._get_token()}
         if prefer_localized:
             headers["Accept-Language"] = KODI_LANGUAGE
         try:
@@ -86,14 +91,15 @@ class TheTvDb(object):
                 data = json.loads(response.content.decode('utf-8', 'replace'))
             elif response.status_code == 401:
                 # token expired, refresh it and repeat our request
-                headers['Bearer'] = self.get_token(True)
+                self._log_msg("Token expired, refreshing...")
+                headers['Bearer'] = self._get_token(True)
                 response = requests.get(url, headers=headers, timeout=5)
                 if response and response.content and response.status_code == 200:
                     data = json.loads(response.content.decode('utf-8', 'replace'))
             if data.get("data"):
                 data = data["data"]
         except Exception as exc:
-            self.log_msg("Exception in get_data --> %s" % repr(exc), xbmc.LOGERROR)
+            self._log_msg("Exception in get_data --> %s" % repr(exc), xbmc.LOGERROR)
         return data
 
     @use_cache(60)
@@ -143,7 +149,7 @@ class TheTvDb(object):
                 seriesdetails = self.get_series(episode["seriesid"])
             elif not seriesdetails and "seriesId" in episode:
                 seriesdetails = self.get_series(episode["seriesId"])
-            episode = self.map_episode_data(episode, seriesdetails)
+            episode = self._map_episode_data(episode, seriesdetails)
         return episode
 
     @use_cache(14)
@@ -156,7 +162,7 @@ class TheTvDb(object):
         # we prefer localized content but if that fails, fallback to default
         if not seriesinfo.get("overview"):
             seriesinfo = self.get_data("series/%s" % seriesid)
-        return self.map_series_data(seriesinfo)
+        return self._map_series_data(seriesinfo)
 
     @use_cache(7)
     def get_series_by_imdb_id(self, imdbid=""):
@@ -167,7 +173,7 @@ class TheTvDb(object):
         else:
             return {}
 
-    @use_cache(7)
+    @use_cache(3)
     def get_continuing_series(self):
         '''
             only gets the continuing series,
@@ -208,6 +214,7 @@ class TheTvDb(object):
                 page += 1
         return all_episodes
 
+    @use_cache(14)
     def get_last_season_for_series(self, seriesid):
         '''get the last season for the series'''
         highest_season = 0
@@ -218,6 +225,7 @@ class TheTvDb(object):
                     highest_season = int(season)
         return highest_season
 
+    @use_cache(1)
     def get_last_episode_for_series(self, seriesid):
         '''
             Returns the last aired episode for a given series
@@ -240,7 +248,7 @@ class TheTvDb(object):
                     return self.get_episode(highest_eps[1])
             # go down one season untill we reach a match (there may be already announced seasons in the seasons list)
             highest_season -= 1
-        self.log_msg("No last episodes found for series %s" % seriesid)
+        self._log_msg("No last episodes found for series %s" % seriesid)
         return None
 
     @use_cache(7)
@@ -270,7 +278,7 @@ class TheTvDb(object):
                 page += 1
         return all_episodes
 
-    @use_cache(14)
+    @use_cache(7)
     def get_series_episodes_summary(self, seriesid):
         '''
             Returns a summary of the episodes and seasons available for the series.
@@ -280,7 +288,7 @@ class TheTvDb(object):
         '''
         return self.get_data("series/%s/episodes/summary" % (seriesid))
 
-    @use_cache(30)
+    @use_cache(8)
     def search_series(self, query="", prefer_localized=False):
         '''
             Allows the user to search for a series based the name.
@@ -348,107 +356,77 @@ class TheTvDb(object):
         # return our list sorted by date
         return sorted(next_episodes, key=lambda k: k.get('firstAired', ""))
 
-    def get_kodi_series(self):
-        '''get all tvshows in the kodi library and make sure we have a valid tvdb id - returns kodi tvshow details'''
-        kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows', '{"properties": [ %s ] }' % KODI_TV_PROPS)
+    def get_kodishows(self, continuing_only=False):
+        '''
+            get all tvshows in the kodi library and make sure we have a valid tvdb id
+            returns combined tvshow details
+        '''
+        kodi_series = self._get_kodi_json('VideoLibrary.GetTvShows', '{"properties": [ %s ] }' % KODI_TV_PROPS)
         all_series = []
+        monitor = xbmc.Monitor()
         if kodi_series and kodi_series.get("tvshows"):
             for kodi_serie in kodi_series["tvshows"]:
-                tvdb_details = self.get_seriesinfo_for_kodishow(kodi_serie)
+                if monitor.abortRequested() or self._close_called:
+                    break
+                tvdb_details = self._parse_kodi_show(kodi_serie)
                 if tvdb_details:
-                    kodi_serie["tvdb_id"] = tvdb_details["tvdb_id"]
-                    kodi_serie["tvdb_status"] = tvdb_details["status"]
-                    all_series.append(kodi_serie)
+                    if not continuing_only or (continuing_only and tvdb_details["status"] == "Continuing"):
+                        all_series.append(tvdb_details)
+        del monitor
         return all_series
 
-    @use_cache(2)
-    def get_full_series_details(self, seriesid, series_info=None):
+    def get_kodishows_details(self, continuing_only=False):
         '''
-            returns full tvdb info for the series (including last- and next episode)
-            instead of only a tvdbid, a full seriesinfo object can be given,
-            in that case only next/last episode info will be appended
+            returns full info for each tvshow in the kodi library
+            returns both kodi and tvdb info combined, including next-/last episode
         '''
-        if not series_info:
-            series_info = self.get_series(seriesid)
-        # next airing episode details
-        next_episode = [self.get_nextaired_episode(seriesid)] if series_info["status"] == "Continuing" else None
-        series_info["next_episode"] = next_episode
-        # last episode details
-        series_info["last_episode"] = self.get_last_episode_for_series(seriesid)
-        return series_info
-
-    def get_all_kodi_series_details(self):
-        '''returns full info for each tvshow in the kodi library - returns both kodi and tvdb info combined'''
         result = []
-        for kodi_details in self.get_kodi_series():
-            all_info = self.get_kodi_series_details(kodi_details["tvshowid"], 
-                    kodi_details["title"], kodi_details=kodi_details)
-            result.append(all_info)
+        monitor = xbmc.Monitor()
+        for series_info in self.get_kodishows(continuing_only=continuing_only):
+            if monitor.abortRequested() or self._close_called:
+                break
+            details = self.get_kodishow_details(series_info["title"], series_info)
+            if details:
+                result.append(series_info)
+        del monitor
         return result
+
+    def get_kodishows_airingtoday(self):
+        '''
+            returns full info for each tvshow in the kodi library that airs today
+        '''
+        result = []
+        monitor = xbmc.Monitor()
+        for series_info in self.get_kodishows(continuing_only=True):
+            if monitor.abortRequested() or self._close_called:
+                break
+            details = self.get_kodishow_details(series_info["title"], series_info)
+            if details and details.get("next_episode"):
+                airdate = arrow.get(details["next_episode"]["firstaired"]).date()
+                if airdate == date.today():
+                    result.append(series_info)
+        del monitor
+        return sorted(result, key=lambda k: k.get('airtime', ""))
 
     @use_cache(2)
-    def get_kodi_series_details(self, tvshowid=None, title=None, kodi_details=None):
-        '''get full details for the kodi serie in library - search by tvshowid or title'''
+    def get_kodishow_details(self, title, serie_details=None):
+        '''get full details for the kodi serie in library - search by title (as in kodi db)'''
         result = None
-        if not kodi_details and tvshowid:
-            # get kodi details by kodi tvshowid
-            kodi_details = self.get_kodi_json('VideoLibrary.GetTvShows', 
-                '"tvshowid": %s, {"properties": [ %s ] }' % (tvshowid, KODI_TV_PROPS))
-        elif not kodi_details and title:
-            # get kodi details by title (less accurate)
-            for filter_op in ["is", "contains"]:
-                filter_str = '"filter": {"operator": "%s", "field": "tag", "value": "%s"}' %(filter_op, title)
-                kodi_series = self.get_kodi_json('VideoLibrary.GetTvShows', 
-                            '{"properties": [ %s ], %s }' % (KODI_TV_PROPS, filter_str))
-                if kodi_series and kodi_series.get("tvshows"):
-                    kodi_details = kodi_series["tvshows"][0]
-                    break
-        if kodi_details:
-            serie_details = self.get_seriesinfo_for_kodishow(kodi_details)
-            serie_details = self.get_full_series_details(serie_details["tvdb_id"], serie_details)
-            # combine kodi details with tvdb details
-            for key, value in serie_details.items():
-                if not kodi_details.get(key):
-                    kodi_details[key] = value
-            for key, value in serie_details["art"].items():
-                if not kodi_details["art"].get(key):
-                    kodi_details["art"][key] = value
-            result = kodi_details
+        if not serie_details and title:
+            # get kodi details by title
+            filter_str = '"filter": {"operator": "is", "field": "title", "value": "%s"}' % title
+            kodi_series = self._get_kodi_json('VideoLibrary.GetTvShows',
+                                              '{"properties": [ %s ], %s }' % (KODI_TV_PROPS, filter_str))
+            if kodi_series and kodi_series.get("tvshows"):
+                kodi_details = kodi_series["tvshows"][0]
+                serie_details = self._parse_kodi_show(kodi_details)
+        if serie_details:
+            # append next airing episode details
+            serie_details["next_episode"] = self.get_nextaired_episode(serie_details["tvdb_id"])
+            # append last episode details
+            serie_details["last_episode"] = self.get_last_episode_for_series(serie_details["tvdb_id"])
+            result = serie_details
         return result
-                   
-    @use_cache(14)
-    def get_seriesinfo_for_kodishow(self, kodi_serie):
-        ''' get tvdb series details by providing kodi showdetails'''
-        tvdb_details = None
-        if kodi_serie["imdbnumber"] and kodi_serie["imdbnumber"].startswith("tt"):
-            # lookup serie by imdbid
-            tvdb_details = self.get_series_by_imdb_id(kodi_serie["imdbnumber"])
-        elif kodi_serie["imdbnumber"]:
-            # assume imdbid in kodidb is already tvdb id
-            tvdb_details = self.get_series(kodi_serie["imdbnumber"])
-        elif "uniqueid" in kodi_serie:
-            # kodi 17+ uses the uniqueid field to store the imdb/tvdb number
-            for value in kodi_serie["uniqueid"]:
-                if value.startswith("tt"):
-                    tvdb_details = self.get_series_by_imdb_id(value)
-                elif value:
-                    tvdb_details = self.get_series(value)
-                if tvdb_details:
-                    break
-        if not tvdb_details:
-            # lookup series id by name
-            result = self.search_series(kodi_serie["title"])
-            if result:
-                tvdb_details = result[0]
-        return tvdb_details
-
-    def get_continuing_kodi_series(self):
-        '''get all shows in kodi library that are returning (or new) - returns kodi tvshow details'''
-        cont_series = []
-        for item in self.get_kodi_series():
-            if item["tvdb_status"] == "Continuing":
-                cont_series.append(item)
-        return cont_series
 
     def get_kodi_unaired_episodes(self, single_episode_per_show=True, include_last_episode=False):
         '''
@@ -456,7 +434,7 @@ class TheTvDb(object):
             single_episode_per_show: Only return a single episode (next unaired) for each show, defaults to True.
             include_last_episode: Also include the last aired episode in the listing for each show.
         '''
-        kodi_series = self.get_continuing_kodi_series()
+        kodi_series = self.get_kodishows(True)
         next_episodes = []
         for kodi_serie in kodi_series:
             serieid = kodi_serie["tvdb_id"]
@@ -469,11 +447,11 @@ class TheTvDb(object):
             for next_episode in episodes:
                 if next_episode:
                     # make the json output kodi compatible
-                    next_episodes.append(self.map_kodi_data(kodi_serie, next_episode))
+                    next_episodes.append(self._map_kodi_episode_data(kodi_serie, next_episode))
         # return our list sorted by date
         return sorted(next_episodes, key=lambda k: k.get('firstaired', ""))
 
-    def map_episode_data(self, episode_details, seriesdetails=None):
+    def _map_episode_data(self, episode_details, seriesdetails=None):
         '''maps full episode data from tvdb to kodi compatible format'''
         result = {}
         result["art"] = {}
@@ -494,8 +472,8 @@ class TheTvDb(object):
         if len(str(result["rating"])) == 1:
             result["rating"] = "%s.0" % result["rating"]
         result["plot"] = episode_details["overview"]
-        result["airdate"] = self.get_local_date(episode_details["firstAired"])
-        result["airdate.long"] = self.get_local_date(episode_details["firstAired"], True)
+        result["airdate"] = self._get_local_date(episode_details["firstAired"])
+        result["airdate.long"] = self._get_local_date(episode_details["firstAired"], True)
         result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
         result["seriesid"] = episode_details["seriesId"]
         # append seriesinfo to details if provided
@@ -505,6 +483,7 @@ class TheTvDb(object):
             result["network"] = seriesdetails["network"]
             result["studio"] = seriesdetails["studio"]
             result["genre"] = seriesdetails["genre"]
+            result["classification"] = seriesdetails["classification"]
             result["tvshow.firstaired"] = seriesdetails["firstaired"]
             result["tvshow.status"] = seriesdetails["status"]
             result["airtime"] = seriesdetails["airtime"]
@@ -524,29 +503,32 @@ class TheTvDb(object):
             season_posters = self.get_series_posters(episode_details["seriesId"], episode_details["airedSeason"])
             if season_posters:
                 result["art"]["season.poster"] = season_posters[0]
+            result["library"] = seriesdetails.get("library", "")
+            result["file"] = seriesdetails.get("file", "")
+            result["year"] = seriesdetails.get("year", "")
         return result
 
-    def map_kodi_data(self, kodi_tv_show_details, episode_details):
-        '''combine kodi tvshow details with episode details'''
+    def _map_kodi_episode_data(self, kodi_tvshow_details, episode_details):
+        '''combine kodi tvshow details with tvdb episode details'''
         result = episode_details
         # add images from kodi series details
-        for key, value in kodi_tv_show_details["art"].items():
-            result["art"]["tvshow.%s" % key] = self.get_clean_image(value)
+        for key, value in kodi_tvshow_details["art"].items():
+            result["art"]["tvshow.%s" % key] = self._get_clean_image(value)
         result["art"]["season.poster"] = episode_details.get("season.poster", "")
-        result["tvshowtitle"] = kodi_tv_show_details["title"]
-        result["showtitle"] = kodi_tv_show_details["title"]
-        result["studio"] = kodi_tv_show_details["studio"]
-        result["genre"] = kodi_tv_show_details["genre"]
-        result["cast"] = kodi_tv_show_details["cast"]
-        result["kodi_tvshowid"] = kodi_tv_show_details["tvshowid"]
+        result["tvshowtitle"] = kodi_tvshow_details["title"]
+        result["showtitle"] = kodi_tvshow_details["title"]
+        result["studio"] = kodi_tvshow_details["studio"]
+        result["genre"] = kodi_tvshow_details["genre"]
+        result["cast"] = kodi_tvshow_details["cast"]
+        result["kodi_tvshowid"] = kodi_tvshow_details["tvshowid"]
         result["episodeid"] = -1
-        result["file"] = "videodb://tvshows/titles/%s/" % kodi_tv_show_details["tvshowid"]
+        result["file"] = "videodb://tvshows/titles/%s/" % kodi_tvshow_details["tvshowid"]
         result["type"] = "episode"
         result["DBTYPE"] = "episode"
         result["isFolder"] = True
         return result
 
-    def map_series_data(self, showdetails):
+    def _map_series_data(self, showdetails):
         '''maps the tvdb data to more kodi compatible format'''
         result = {}
         if showdetails:
@@ -555,11 +537,11 @@ class TheTvDb(object):
             result["tvdb_id"] = showdetails["id"]
             result["network"] = showdetails["network"]
             result["studio"] = [showdetails["network"]]
-            local_airday, local_airday_short, airday_int = self.get_local_weekday(showdetails["airsDayOfWeek"])
+            local_airday, local_airday_short, airday_int = self._get_local_weekday(showdetails["airsDayOfWeek"])
             result["airday"] = local_airday
             result["airday.short"] = local_airday_short
             result["airday.int"] = airday_int
-            result["airtime"] = self.get_local_time(showdetails["airsTime"])
+            result["airtime"] = self._get_local_time(showdetails["airsTime"])
             result["airdaytime"] = "%s %s (%s)" % (result["airday"], result["airtime"], result["network"])
             result["airdaytime.short"] = "%s %s" % (result["airday.short"], result["airtime"])
             result["airdaytime.label"] = "%s %s - %s %s" % (result["airday"],
@@ -584,6 +566,8 @@ class TheTvDb(object):
                 pass
             result["plot"] = showdetails["overview"]
             result["genre"] = showdetails["genre"]
+            classification = CLASSIFICATION_REGEX.search("/".join(showdetails["genre"]))
+            result["classification"] = classification.group(1) if classification else 'Scripted'
             result["firstaired"] = showdetails["firstAired"]
             result["imdbnumber"] = showdetails["imdbId"]
             # artwork
@@ -604,18 +588,58 @@ class TheTvDb(object):
                 result["art"]["banner"] = "http://thetvdb.com/banners/" + showdetails["banner"]
         return result
 
+    def _parse_kodi_show(self, kodi_details):
+        ''' get tvdb series details by providing kodi showdetails'''
+        tvdb_details = None
+        result = None
+        if kodi_details["imdbnumber"] and kodi_details["imdbnumber"].startswith("tt"):
+            # lookup serie by imdbid
+            tvdb_details = self.get_series_by_imdb_id(kodi_details["imdbnumber"])
+        elif kodi_details["imdbnumber"]:
+            # assume imdbid in kodidb is already tvdb id
+            tvdb_details = self.get_series(kodi_details["imdbnumber"])
+        if not tvdb_details and "uniqueid" in kodi_details:
+            # kodi 17+ uses the uniqueid field to store the imdb/tvdb number
+            for value in kodi_details["uniqueid"]:
+                if value.startswith("tt"):
+                    tvdb_details = self.get_series_by_imdb_id(value)
+                elif value:
+                    tvdb_details = self.get_series(value)
+                if tvdb_details:
+                    break
+        if not tvdb_details:
+            # lookup series by name as fallback
+            tvdb_search = self.search_series(kodi_details["title"])
+            if tvdb_search:
+                tvdb_details = self.get_series(tvdb_search[0]["id"])
+        if tvdb_details:
+            # combine kodi tvshow details with tvdb series details
+            result = kodi_details
+            # append images from tvdb details
+            for key, value in tvdb_details["art"].items():
+                if value and not result["art"].get(key):
+                    result["art"][key] = value
+            # combine info from both dicts
+            for key, value in tvdb_details.items():
+                if value and not result.get(key):
+                    result[key] = value
+            result["isFolder"] = True
+            result["tvdb_status"] = tvdb_details["status"]
+            result["library"] = "videodb://tvshows/titles/%s/" % kodi_details["tvshowid"]
+        return result
+
     @staticmethod
-    def log_msg(msg, level=xbmc.LOGDEBUG):
+    def _log_msg(msg, level=xbmc.LOGDEBUG):
         '''logger to kodi log'''
         if isinstance(msg, unicode):
             msg = msg.encode("utf-8")
         xbmc.log('{0} --> {1}'.format(ADDON_ID, msg), level=level)
 
     @staticmethod
-    def get_clean_image(image):
+    def _get_clean_image(image):
         '''helper to strip all kodi tags/formatting of an image path/url'''
-        if not image:
-            return ""
+        if not image or isinstance(image, list):
+            return image
         if image and "image://" in image:
             image = image.replace("image://", "")
             image = urllib.unquote(image.encode("utf-8"))
@@ -625,7 +649,7 @@ class TheTvDb(object):
             image = image.decode("utf8")
         return image
 
-    def get_token(self, refresh=False):
+    def _get_token(self, refresh=False):
         '''get jwt token for api'''
         # get token from memory cache first
         if self._token and not refresh:
@@ -662,11 +686,11 @@ class TheTvDb(object):
             self._token = token
             return token
         else:
-            self.log_msg("Error getting JWT token!")
+            self._log_msg("Error getting JWT token!", xbmc.LOGWARNING)
             return None
 
     @staticmethod
-    def get_kodi_json(method, params):
+    def _get_kodi_json(method, params):
         '''helper to get data from the kodi json database'''
         json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }'
                                             % (method, params.encode("utf-8")))
@@ -675,11 +699,11 @@ class TheTvDb(object):
             jsonobject = jsonobject['result']
         return jsonobject
 
-    def get_local_time(self, timestr):
+    def _get_local_time(self, timestr):
         '''returns the correct localized representation of the time provided by the api'''
         result = ""
         try:
-            if timestr:
+            if timestr and ":" in timestr:
                 timestr = timestr.replace(".", ":")
                 if "H" in xbmc.getRegion('time'):
                     time_format = "HH:mm"
@@ -693,15 +717,17 @@ class TheTvDb(object):
                     result = arrow.get(timestr, 'h:mmA').format(time_format, locale=KODI_LANGUAGE)
                 elif "am" in timestr or "pm" in timestr:
                     result = arrow.get(timestr, 'h:mma').format(time_format, locale=KODI_LANGUAGE)
+                elif len(timestr.split(":")[0]) == 1:
+                    result = arrow.get(timestr, 'h:mm').format(time_format, locale=KODI_LANGUAGE)
                 else:
                     result = arrow.get(timestr, 'HH:mm').format(time_format, locale=KODI_LANGUAGE)
         except Exception as exc:
-            self.log_msg(str(exc), xbmc.LOGWARNING)
+            self._log_msg(str(exc), xbmc.LOGWARNING)
             return timestr
         return result
 
     @staticmethod
-    def get_local_date(datestr, long_date=False):
+    def _get_local_date(datestr, long_date=False):
         '''returns the localized representation of the date provided by the api'''
         result = ""
         try:
@@ -710,10 +736,10 @@ class TheTvDb(object):
             else:
                 result = arrow.get(datestr).strftime(xbmc.getRegion('dateshort'))
         except Exception as exc:
-            log_msg("Exception in get_local_date: %s" % exc)
+            _log_msg("Exception in _get_local_date: %s" % exc)
         return result
 
-    def get_local_weekday(self, weekday):
+    def _get_local_weekday(self, weekday):
         '''returns the localized representation of the weekday provided by the api'''
         if not weekday:
             return ("", "", 0)
@@ -729,5 +755,5 @@ class TheTvDb(object):
                 day_name = locale.day_name(day_int).capitalize()
                 day_name_short = locale.day_abbreviation(day_int).capitalize()
         except Exception as exc:
-            self.log_msg(str(exc), xbmc.LOGWARNING)
+            self._log_msg(str(exc), xbmc.LOGWARNING)
         return (day_name, day_name_short, day_int)
