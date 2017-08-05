@@ -534,6 +534,7 @@ class TheTvDb(object):
         if showdetails:
             result["title"] = showdetails["seriesName"]
             result["status"] = showdetails["status"]
+            result["tvdb_status"] = showdetails["status"]
             result["tvdb_id"] = showdetails["id"]
             result["network"] = showdetails["network"]
             result["studio"] = [showdetails["network"]]
@@ -750,10 +751,10 @@ class TheTvDb(object):
             locale = arrow.locales.get_locale(KODI_LANGUAGE)
             day_names = {"monday": 1, "tuesday": 2, "wednesday": 3, "thurday": 4,
                          "friday": 5, "saturday": 6, "sunday": 7}
-            day_int = day_names.get(weekday.lower())
+            day_int = day_names.get(weekday.lower(), 0)
             if day_int:
                 day_name = locale.day_name(day_int).capitalize()
                 day_name_short = locale.day_abbreviation(day_int).capitalize()
         except Exception as exc:
-            self._log_msg(str(exc), xbmc.LOGWARNING)
+            self._log_msg(str(exc))
         return (day_name, day_name_short, day_int)
