@@ -369,8 +369,8 @@ class TheTvDb(object):
                 if monitor.abortRequested() or self._close_called:
                     break
                 tvdb_details = self._parse_kodi_show(kodi_serie)
-                if tvdb_details:
-                    if not continuing_only or (continuing_only and tvdb_details["status"] == "Continuing"):
+                if tvdb_details and "tvdb_status" in tvdb_details:
+                    if not continuing_only or (continuing_only and tvdb_details["tvdb_status"] == "Continuing"):
                         all_series.append(tvdb_details)
         del monitor
         return all_series
