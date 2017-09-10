@@ -242,7 +242,7 @@ class TheTvDb(object):
                 for episode in season_episodes:
                     if episode["firstAired"]:
                         airdate = arrow.get(episode["firstAired"]).date()
-                        if (airdate <= date.today()) and (airdate > highest_eps[0]):
+                        if (airdate < date.today()) and (airdate > highest_eps[0]):
                             highest_eps = (airdate, episode["id"])
                 if highest_eps[1] != 0:
                     return self.get_episode(highest_eps[1])
