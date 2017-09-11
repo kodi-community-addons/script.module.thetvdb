@@ -385,7 +385,7 @@ class TheTvDb(object):
         for series_info in self.get_kodishows(continuing_only=continuing_only):
             if monitor.abortRequested() or self._close_called:
                 break
-            details = self.get_kodishow_details(series_info["title"], series_info)
+            details = self.get_kodishow_details(series_info["title"], serie_details=series_info)
             if details:
                 result.append(series_info)
         del monitor
@@ -400,7 +400,7 @@ class TheTvDb(object):
         for series_info in self.get_kodishows(continuing_only=True):
             if monitor.abortRequested() or self._close_called:
                 break
-            details = self.get_kodishow_details(series_info["title"], series_info)
+            details = self.get_kodishow_details(series_info["title"], serie_details=series_info)
             if details and details.get("next_episode"):
                 airdate = arrow.get(details["next_episode"]["firstaired"]).date()
                 if airdate == date.today():
