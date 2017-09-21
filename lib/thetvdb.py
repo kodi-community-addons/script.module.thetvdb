@@ -428,7 +428,7 @@ class TheTvDb(object):
             result = serie_details
         return result
 
-    def get_kodi_unaired_episodes(self, single_episode_per_show=True, include_last_episode=False):
+    def get_kodi_unaired_episodes(self, single_episode_per_show=True, tvshows_ids=[], include_last_episode=False):
         '''
             Returns the next unaired episode for all continuing tv shows in the Kodi library
             single_episode_per_show: Only return a single episode (next unaired) for each show, defaults to True.
@@ -437,17 +437,18 @@ class TheTvDb(object):
         kodi_series = self.get_kodishows(True)
         next_episodes = []
         for kodi_serie in kodi_series:
-            serieid = kodi_serie["tvdb_id"]
-            if single_episode_per_show:
-                episodes = [self.get_nextaired_episode(serieid)]
-            else:
-                episodes = self.get_unaired_episodes(serieid)
-            if include_last_episode:
-                episodes.append(self.get_last_episode_for_series(serieid))
-            for next_episode in episodes:
-                if next_episode:
-                    # make the json output kodi compatible
-                    next_episodes.append(self._map_kodi_episode_data(kodi_serie, next_episode))
+            if kodi_serie["tvshowid"] in tvshows_ids:
+                serieid = kodi_serie["tvdb_id"]
+                if single_episode_per_show:
+                    episodes = [self.get_nextaired_episode(serieid)]
+                else:
+                    episodes = self.get_unaired_episodes(serieid)
+                if include_last_episode:
+                    episodes.append(self.get_last_episode_for_series(serieid))
+                for next_episode in episodes:
+                    if next_episode:
+                        # make the json output kodi compatible
+                        next_episodes.append(self._map_kodi_episode_data(kodi_serie, next_episode))
         # return our list sorted by date
         return sorted(next_episodes, key=lambda k: k.get('firstaired', ""))
 
