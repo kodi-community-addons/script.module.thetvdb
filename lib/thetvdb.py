@@ -428,7 +428,7 @@ class TheTvDb(object):
             result = serie_details
         return result
 
-    def get_kodi_unaired_episodes(self, single_episode_per_show=True, include_last_episode=False):
+    def get_kodi_unaired_episodes(self, single_episode_per_show=True, include_last_episode=False, tvshows_ids=None):
         '''
             Returns the next unaired episode for all continuing tv shows in the Kodi library
             single_episode_per_show: Only return a single episode (next unaired) for each show, defaults to True.
@@ -436,6 +436,8 @@ class TheTvDb(object):
         '''
         kodi_series = self.get_kodishows(True)
         next_episodes = []
+        if tvshows_ids:
+            kodi_series = [ tvshow for tvshow in kodi_series if tvshow["tvshowid"] in tvshows_ids ]
         for kodi_serie in kodi_series:
             serieid = kodi_serie["tvdb_id"]
             if single_episode_per_show:
@@ -567,7 +569,7 @@ class TheTvDb(object):
                 pass
             result["plot"] = showdetails["overview"]
             result["genre"] = showdetails["genre"]
-            classification = CLASSIFICATION_REGEX.search("/".join(showdetails["genre"]))
+            classification = CLASSIFICATION_REGEX.search("/".join(showdetails["genre"])) if isinstance(showdetails["genre"], list) else None
             result["classification"] = classification.group(1) if classification else 'Scripted'
             result["firstaired"] = showdetails["firstAired"]
             result["imdbnumber"] = showdetails["imdbId"]
