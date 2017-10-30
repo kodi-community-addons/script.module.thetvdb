@@ -127,8 +127,10 @@ class TheTvDb(object):
         if images:
             for image in images:
                 if image["fileName"] and not image["fileName"].endswith("/"):
-                    if not image["fileName"].startswith("http://"):
-                        image["fileName"] = "http://thetvdb.com/banners/" + image["fileName"]
+                    if image["fileName"].startswith("http://"): 
+                        image["fileName"] = image["fileName"].replace("http://", "https://")
+                    elif not image["fileName"].startswith("https://"):
+                        image["fileName"] = "https://thetvdb.com/banners/" + image["fileName"]
                     image_score = image["ratingsInfo"]["average"] * image["ratingsInfo"]["count"]
                     image["score"] = image_score
                     result.append(image)
@@ -458,7 +460,7 @@ class TheTvDb(object):
         result = {}
         result["art"] = {}
         if episode_details.get("filename"):
-            result["art"]["thumb"] = "http://thetvdb.com/banners/" + episode_details["filename"]
+            result["art"]["thumb"] = "https://thetvdb.com/banners/" + episode_details["filename"]
             result["thumbnail"] = result["art"]["thumb"]
         result["title"] = episode_details["episodeName"]
         result["label"] = "%sx%s. %s" % (episode_details["airedSeason"],
@@ -588,7 +590,7 @@ class TheTvDb(object):
                 result["art"]["posters"] = posters
                 result["art"]["poster"] = posters[0]
             if showdetails.get("banner"):
-                result["art"]["banner"] = "http://thetvdb.com/banners/" + showdetails["banner"]
+                result["art"]["banner"] = "https://thetvdb.com/banners/" + showdetails["banner"]
         return result
 
     def _parse_kodi_show(self, kodi_details):
