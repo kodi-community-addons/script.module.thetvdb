@@ -60,7 +60,7 @@ class TheTvDb(object):
         self._win = xbmcgui.Window(10000)
         self._addon = xbmcaddon.Addon(ADDON_ID)
         addonversion = self._addon.getAddonInfo('version').decode("utf-8")
-        self.cache.global_checksum = addonversion
+        self.cache.global_checksum = "%s%s" % (addonversion, KODI_LANGUAGE)
         self._log_msg("Initialized")
 
     def close(self):
