@@ -731,8 +731,7 @@ class TheTvDb(object):
             return timestr
         return result
 
-    @staticmethod
-    def _get_local_date(datestr, long_date=False):
+    def _get_local_date(self, datestr, long_date=False):
         '''returns the localized representation of the date provided by the api'''
         result = ""
         try:
@@ -741,7 +740,7 @@ class TheTvDb(object):
             else:
                 result = arrow.get(datestr).strftime(xbmc.getRegion('dateshort'))
         except Exception as exc:
-            _log_msg("Exception in _get_local_date: %s" % exc)
+            self._log_msg("Exception in _get_local_date: %s" % exc)
         return result
 
     def _get_local_weekday(self, weekday):
