@@ -7,7 +7,7 @@ Kodi python module to access the new thetvdb api v2
 The module is supported by the simplecache module to ensure that data is not useless retrieved from the API all the time.
 
 
-## Help needed with maintaining !
+## Help needed with maintaining!
 I am very busy currently so I do not have a lot of time to work on this project or watch the forums.
 Be aware that this is a community driven project, so feel free to submit PR's yourself to improve the code and/or help others with support on the forums etc. If you're willing to really participate in the development, please contact me so I can give you write access to the repo. I do my best to maintain the project every once in a while, when I have some spare time left.
 Thanks for understanding!
@@ -27,7 +27,7 @@ Just make sure to import it within your addon.xml:
 Now, to use it in your Kodi addon/script, make sure to import it and you can access it's methods.
 Note that you will have to register at TVDB for an api key for your addon.
 
-```
+```python
 from thetvdb import TheTvDb
 tvdb = TheTvDb(api_key=YOURAPIKEYFORTVDB)
 next_aired_episodes = tvdb.get_kodi_unaired_episodes(single_episode_per_show=False)
