@@ -14,8 +14,9 @@
     <extension point="xbmc.addon.metadata">
         <summary>TheTVDB API v2 python module for Kodi</summary>
         <description>TheTVDB API v2 python module for Kodi</description>
+        <news>v1.0.27 (2019-12-24 wuff)[CR]* Kodi 19 / Python 3 fixes[CR][CR]v1.0.26 (2018-03-30)[CR]* Last update from marcelveldt</news>
         <license>Apache 2.0</license>
-        <source>https://github.com/marcelveldt/script.module.thetvdb</source>
+        <source>https://github.com/kodi-community-addons/script.module.thetvdb</source>
         <platform>all</platform>
     </extension>
 </addon>
