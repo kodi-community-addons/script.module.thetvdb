@@ -20,7 +20,7 @@ except ImportError:
     import json
 from simplecache import use_cache, SimpleCache
 import arrow
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import re
 
 # set some parameters to the requests module
@@ -59,7 +59,7 @@ class TheTvDb(object):
         self.cache = SimpleCache()
         self._win = xbmcgui.Window(10000)
         self._addon = xbmcaddon.Addon(ADDON_ID)
-        addonversion = self._addon.getAddonInfo('version').decode("utf-8")
+        addonversion = self._addon.getAddonInfo('version')
         self.cache.global_checksum = "%s%s" % (addonversion, KODI_LANGUAGE)
         self._log_msg("Initialized")
 
@@ -88,14 +88,18 @@ class TheTvDb(object):
         try:
             response = requests.get(url, headers=headers, timeout=20)
             if response and response.content and response.status_code == 200:
-                data = json.loads(response.content.decode('utf-8', 'replace'))
+#py2                data = json.loads(response.content.decode('utf-8', 'replace'))
+#py3
+                data = json.loads(response.content)
             elif response.status_code == 401:
                 # token expired, refresh it and repeat our request
                 self._log_msg("Token expired, refreshing...")
                 headers['Bearer'] = self._get_token(True)
                 response = requests.get(url, headers=headers, timeout=5)
                 if response and response.content and response.status_code == 200:
-                    data = json.loads(response.content.decode('utf-8', 'replace'))
+#py2                    data = json.loads(response.content.decode('utf-8', 'replace'))
+#py3
+                    data = json.loads(response.content)
             if data.get("data"):
                 data = data["data"]
         except Exception as exc:
@@ -516,7 +520,7 @@ class TheTvDb(object):
         '''combine kodi tvshow details with tvdb episode details'''
         result = episode_details
         # add images from kodi series details
-        for key, value in kodi_tvshow_details["art"].items():
+        for key, value in list(kodi_tvshow_details["art"].items()):
             result["art"]["tvshow.%s" % key] = self._get_clean_image(value)
         result["art"]["season.poster"] = episode_details.get("season.poster", "")
         result["tvshowtitle"] = kodi_tvshow_details["title"]
@@ -621,11 +625,11 @@ class TheTvDb(object):
             # combine kodi tvshow details with tvdb series details
             result = kodi_details
             # append images from tvdb details
-            for key, value in tvdb_details["art"].items():
+            for key, value in list(tvdb_details["art"].items()):
                 if value and not result["art"].get(key):
                     result["art"][key] = value
             # combine info from both dicts
-            for key, value in tvdb_details.items():
+            for key, value in list(tvdb_details.items()):
                 if value and not result.get(key):
                     result[key] = value
             result["isFolder"] = True
@@ -636,8 +640,6 @@ class TheTvDb(object):
     @staticmethod
     def _log_msg(msg, level=xbmc.LOGDEBUG):
         '''logger to kodi log'''
-        if isinstance(msg, unicode):
-            msg = msg.encode("utf-8")
         xbmc.log('{0} --> {1}'.format(ADDON_ID, msg), level=level)
 
     @staticmethod
@@ -647,11 +649,9 @@ class TheTvDb(object):
             return image
         if image and "image://" in image:
             image = image.replace("image://", "")
-            image = urllib.unquote(image.encode("utf-8"))
+            image = urllib.parse.unquote(image)
             if image.endswith("/"):
                 image = image[:-1]
-        if not isinstance(image, unicode):
-            image = image.decode("utf8")
         return image
 
     def _get_token(self, refresh=False):
@@ -659,7 +659,7 @@ class TheTvDb(object):
         # get token from memory cache first
         if self._token and not refresh:
             return self._token
-        token = self._win.getProperty("script.module.thetvdb.token").decode('utf-8')
+        token = self._win.getProperty("script.module.thetvdb.token")
         if token and not refresh:
             return token
 
@@ -671,7 +671,9 @@ class TheTvDb(object):
                        'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % prev_token}
             response = requests.get(url, headers=headers)
             if response and response.content and response.status_code == 200:
-                data = json.loads(response.content.decode('utf-8', 'replace'))
+#py2                data = json.loads(response.content.decode('utf-8', 'replace'))
+#py3
+                data = json.loads(response.content)
                 token = data["token"]
             if token:
                 self._win.setProperty("script.module.thetvdb.token", token)
@@ -683,8 +685,11 @@ class TheTvDb(object):
         payload = {'apikey': self.api_key}
         headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0'}
         response = requests.post(url, data=json.dumps(payload), headers=headers)
+#py2        data = json.loads(response.content.decode('utf-8', 'replace'))
+#py3
+        data = json.loads(response.content)
         if response and response.content and response.status_code == 200:
-            data = json.loads(response.content.decode('utf-8', 'replace'))
+
             token = data["token"]
             self._addon.setSetting("token", token)
             self._win.setProperty("script.module.thetvdb.token", token)
@@ -699,7 +704,9 @@ class TheTvDb(object):
         '''helper to get data from the kodi json database'''
         json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }'
                                             % (method, params.encode("utf-8")))
-        jsonobject = json.loads(json_response.decode('utf-8', 'replace'))
+#py2        jsonobject = json.loads(json_response.decode('utf-8', 'replace'))
+#py3
+        jsonobject = json.loads(json_response)
         if 'result' in jsonobject:
             jsonobject = jsonobject['result']
         return jsonobject
