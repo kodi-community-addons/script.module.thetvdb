@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="script.module.thetvdb"
-       name="The TVDB API v2"
+       name="The TVDB API v2,v3"
        version="1.0.29"
        provider-name="marcelveldt,wuff">
     <requires>
@@ -12,8 +12,8 @@
     </requires>
     <extension point="xbmc.python.module" library="lib" />
     <extension point="xbmc.addon.metadata">
-        <summary>TheTVDB API v2 python module for Kodi</summary>
-        <description>TheTVDB API v2 python module for Kodi</description>
+        <summary>TheTVDB API v2,v3 python module for Kodi</summary>
+        <description>TheTVDB API v2,v3 python module for Kodi</description>
         <license>Apache 2.0</license>
         <source>https://github.com/kodi-community-addons/script.module.thetvdb</source>
         <platform>all</platform>

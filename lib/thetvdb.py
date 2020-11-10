@@ -6,6 +6,7 @@
     Includes the most common actions including a few special ones for Kodi use
     Full series and episode data is mapped into Kodi compatible format
 '''
+import os, sys
 import requests
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
@@ -20,7 +21,10 @@ except ImportError:
     import json
 from simplecache import use_cache, SimpleCache
 import arrow
-import urllib.request, urllib.parse, urllib.error
+if sys.version_info.major == 3:
+    import urllib.request, urllib.parse, urllib.error
+else:
+    import urllib
 import re
 
 # set some parameters to the requests module
@@ -59,7 +63,10 @@ class TheTvDb(object):
         self.cache = SimpleCache()
         self._win = xbmcgui.Window(10000)
         self._addon = xbmcaddon.Addon(ADDON_ID)
-        addonversion = self._addon.getAddonInfo('version')
+        if sys.version_info.major == 3:
+            addonversion = self._addon.getAddonInfo('version')
+        else:    
+            addonversion = self._addon.getAddonInfo('version').decode("utf-8")    
         self.cache.global_checksum = "%s%s" % (addonversion, KODI_LANGUAGE)
         self._log_msg("Initialized")
 
@@ -88,18 +95,20 @@ class TheTvDb(object):
         try:
             response = requests.get(url, headers=headers, timeout=20)
             if response and response.content and response.status_code == 200:
-#py2                data = json.loads(response.content.decode('utf-8', 'replace'))
-#py3
-                data = json.loads(response.content)
+                if sys.version_info.major == 3:
+                    data = json.loads(response.content)
+                else:
+                    data = json.loads(response.content.decode('utf-8', 'replace'))
             elif response.status_code == 401:
                 # token expired, refresh it and repeat our request
                 self._log_msg("Token expired, refreshing...")
                 headers['Bearer'] = self._get_token(True)
                 response = requests.get(url, headers=headers, timeout=5)
                 if response and response.content and response.status_code == 200:
-#py2                    data = json.loads(response.content.decode('utf-8', 'replace'))
-#py3
-                    data = json.loads(response.content)
+                    if sys.version_info.major == 3:
+                        data = json.loads(response.content)
+                    else:
+                        data = json.loads(response.content.decode('utf-8', 'replace'))
             if data.get("data"):
                 data = data["data"]
         except Exception as exc:
@@ -649,7 +658,10 @@ class TheTvDb(object):
             return image
         if image and "image://" in image:
             image = image.replace("image://", "")
-            image = urllib.parse.unquote(image)
+            if sys.version_info.major == 3:
+                image = urllib.parse.unquote(image)
+            else:
+                image = urllib.unquote(image.encode("utf-8"))
             if image.endswith("/"):
                 image = image[:-1]
         return image
@@ -659,7 +671,10 @@ class TheTvDb(object):
         # get token from memory cache first
         if self._token and not refresh:
             return self._token
-        token = self._win.getProperty("script.module.thetvdb.token")
+        if sys.version_info.major == 3:
+            token = self._win.getProperty("script.module.thetvdb.token")
+        else:
+            token = self._win.getProperty("script.module.thetvdb.token").decode('utf-8')
         if token and not refresh:
             return token
 
@@ -672,8 +687,10 @@ class TheTvDb(object):
             response = requests.get(url, headers=headers)
             if response and response.content and response.status_code == 200:
 #py2                data = json.loads(response.content.decode('utf-8', 'replace'))
-#py3
-                data = json.loads(response.content)
+                if sys.version_info.major == 3:
+                    data = json.loads(response.content)
+                else:
+                    data = json.loads(response.content.decode('utf-8', 'replace'))
                 token = data["token"]
             if token:
                 self._win.setProperty("script.module.thetvdb.token", token)
@@ -685,9 +702,10 @@ class TheTvDb(object):
         payload = {'apikey': self.api_key}
         headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0'}
         response = requests.post(url, data=json.dumps(payload), headers=headers)
-#py2        data = json.loads(response.content.decode('utf-8', 'replace'))
-#py3
-        data = json.loads(response.content)
+        if sys.version_info.major == 3:
+            data = json.loads(response.content)
+        else:
+            data = json.loads(response.content.decode('utf-8', 'replace'))
         if response and response.content and response.status_code == 200:
 
             token = data["token"]
@@ -704,9 +722,10 @@ class TheTvDb(object):
         '''helper to get data from the kodi json database'''
         json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }'
                                             % (method, params.encode("utf-8")))
-#py2        jsonobject = json.loads(json_response.decode('utf-8', 'replace'))
-#py3
-        jsonobject = json.loads(json_response)
+        if sys.version_info.major == 3:
+            jsonobject = json.loads(json_response)
+        else:
+            jsonobject = json.loads(json_response.decode('utf-8', 'replace'))
         if 'result' in jsonobject:
             jsonobject = jsonobject['result']
         return jsonobject
