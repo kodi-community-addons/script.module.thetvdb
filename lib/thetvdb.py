@@ -22,7 +22,8 @@ except ImportError:
 from simplecache import use_cache, SimpleCache
 import arrow
 if sys.version_info.major == 3:
-    import urllib.request, urllib.parse, urllib.error
+    import urllib.request, urllib.error
+    from urllib.parse import unquote
 else:
     import urllib
 import re
@@ -529,7 +530,7 @@ class TheTvDb(object):
         '''combine kodi tvshow details with tvdb episode details'''
         result = episode_details
         # add images from kodi series details
-        for key, value in list(kodi_tvshow_details["art"].items()):
+        for key, value in kodi_tvshow_details["art"].items():
             result["art"]["tvshow.%s" % key] = self._get_clean_image(value)
         result["art"]["season.poster"] = episode_details.get("season.poster", "")
         result["tvshowtitle"] = kodi_tvshow_details["title"]
@@ -594,10 +595,6 @@ class TheTvDb(object):
             if fanarts:
                 result["art"]["fanart"] = fanarts[0]
                 result["art"]["fanarts"] = fanarts
-            landscapes = self.get_series_fanarts(showdetails["id"], True)
-            if landscapes:
-                result["art"]["landscapes"] = landscapes
-                result["art"]["landscape"] = landscapes[0]
             posters = self.get_series_posters(showdetails["id"])
             if posters:
                 result["art"]["posters"] = posters
@@ -634,11 +631,11 @@ class TheTvDb(object):
             # combine kodi tvshow details with tvdb series details
             result = kodi_details
             # append images from tvdb details
-            for key, value in list(tvdb_details["art"].items()):
+            for key, value in tvdb_details["art"].items():
                 if value and not result["art"].get(key):
                     result["art"][key] = value
             # combine info from both dicts
-            for key, value in list(tvdb_details.items()):
+            for key, value in tvdb_details.items():
                 if value and not result.get(key):
                     result[key] = value
             result["isFolder"] = True
@@ -647,8 +644,7 @@ class TheTvDb(object):
         return result
 
     @staticmethod
-    def _log_msg(msg, level=xbmc.LOGDEBUG):
-        '''logger to kodi log'''
+    def _log_msg(msg, level=xbmc.LOGINFO):
         xbmc.log('{0} --> {1}'.format(ADDON_ID, msg), level=level)
 
     @staticmethod
@@ -658,10 +654,7 @@ class TheTvDb(object):
             return image
         if image and "image://" in image:
             image = image.replace("image://", "")
-            if sys.version_info.major == 3:
-                image = urllib.parse.unquote(image)
-            else:
-                image = urllib.unquote(image.encode("utf-8"))
+            image = unquote(image)
             if image.endswith("/"):
                 image = image[:-1]
         return image
@@ -671,10 +664,7 @@ class TheTvDb(object):
         # get token from memory cache first
         if self._token and not refresh:
             return self._token
-        if sys.version_info.major == 3:
-            token = self._win.getProperty("script.module.thetvdb.token")
-        else:
-            token = self._win.getProperty("script.module.thetvdb.token").decode('utf-8')
+        token = self._win.getProperty("script.module.thetvdb.token")
         if token and not refresh:
             return token
 
@@ -686,11 +676,7 @@ class TheTvDb(object):
                        'User-agent': 'Mozilla/5.0', 'Authorization': 'Bearer %s' % prev_token}
             response = requests.get(url, headers=headers)
             if response and response.content and response.status_code == 200:
-#py2                data = json.loads(response.content.decode('utf-8', 'replace'))
-                if sys.version_info.major == 3:
-                    data = json.loads(response.content)
-                else:
-                    data = json.loads(response.content.decode('utf-8', 'replace'))
+                data = json.loads(response.content)
                 token = data["token"]
             if token:
                 self._win.setProperty("script.module.thetvdb.token", token)
@@ -702,12 +688,8 @@ class TheTvDb(object):
         payload = {'apikey': self.api_key}
         headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'User-agent': 'Mozilla/5.0'}
         response = requests.post(url, data=json.dumps(payload), headers=headers)
-        if sys.version_info.major == 3:
-            data = json.loads(response.content)
-        else:
-            data = json.loads(response.content.decode('utf-8', 'replace'))
         if response and response.content and response.status_code == 200:
-
+            data = json.loads(response.content)
             token = data["token"]
             self._addon.setSetting("token", token)
             self._win.setProperty("script.module.thetvdb.token", token)
@@ -721,7 +703,7 @@ class TheTvDb(object):
     def _get_kodi_json(method, params):
         '''helper to get data from the kodi json database'''
         json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }'
-                                            % (method, params.encode("utf-8")))
+                                            % (method, params))
         if sys.version_info.major == 3:
             jsonobject = json.loads(json_response)
         else:
