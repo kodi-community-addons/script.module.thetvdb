@@ -481,7 +481,6 @@ class TheTvDb(object):
                                          episode_details["airedEpisodeNumber"], episode_details["episodeName"])
         result["season"] = episode_details["airedSeason"]
         result["episode"] = episode_details["airedEpisodeNumber"]
-        result["firstaired"] = episode_details["firstAired"]
         result["writer"] = episode_details["writers"]
         result["director"] = episode_details["directors"]
         result["gueststars"] = episode_details["guestStars"]
@@ -490,8 +489,17 @@ class TheTvDb(object):
         if len(str(result["rating"])) == 1:
             result["rating"] = "%s.0" % result["rating"]
         result["plot"] = episode_details["overview"]
-        result["airdate"] = self._get_local_date(episode_details["firstAired"])
-        result["airdate.long"] = self._get_local_date(episode_details["firstAired"], True)
+        fmt = "YYYY-MM-DD hh:mm ZZZ"
+        bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtime"], "America/New_York")
+        utc = arrow.get(bne, fmt)
+        local =  utc.to('Europe/Belgrade')
+        result["airdate"] = local.format('YYYY-MM-DD')
+        result["firstaired"] = local.format('YYYY-MM-DD')
+        result["airtime"] = local.format('hh:mm')
+        result["airdate.long"] = self._get_local_date(result["airdate"], True)
+        result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
+        result["airday"] = local.format('dddd')
+        result["airdate.long"] = self._get_local_date(result["airdate"], True)
         result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
         result["seriesid"] = episode_details["seriesId"]
         # append seriesinfo to details if provided
@@ -504,9 +512,7 @@ class TheTvDb(object):
             result["classification"] = seriesdetails["classification"]
             result["tvshow.firstaired"] = seriesdetails["firstaired"]
             result["tvshow.status"] = seriesdetails["status"]
-            result["airtime"] = seriesdetails["airtime"]
-            result["airday"] = seriesdetails["airday"]
-            result["airday.int"] = seriesdetails["airday.int"]
+            result["airday.int"] = local.format('d')
             result["airdatetime"] = "%s %s" % (result["airdate"], result["airtime"])
             result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
                                                           xbmc.getLocalizedString(145), result["network"])
