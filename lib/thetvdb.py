@@ -489,18 +489,22 @@ class TheTvDb(object):
         if len(str(result["rating"])) == 1:
             result["rating"] = "%s.0" % result["rating"]
         result["plot"] = episode_details["overview"]
-        fmt = "YYYY-MM-DD hh:mm ZZZ"
+        if "H" in xbmc.getRegion('time'):
+            fmt = "YYYY-MM-DD hh:mm ZZZ"
+        if "I" in xbmc.getRegion('time'):
+            fmt = "YYYY-MM-DD h:mm A ZZZ"         
         bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtime"], "America/New_York")
         utc = arrow.get(bne, fmt)
-        local =  utc.to('Europe/Belgrade')
+        local =  utc.to('local')
         result["airdate"] = local.format('YYYY-MM-DD')
         result["firstaired"] = local.format('YYYY-MM-DD')
-        result["airtime"] = local.format('hh:mm')
+        result["airtime"] = self._get_local_time(local.format('H:mm'))
         result["airdate.long"] = self._get_local_date(result["airdate"], True)
         result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
         result["airday"] = local.format('dddd')
         result["airdate.long"] = self._get_local_date(result["airdate"], True)
         result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
+        result["airdate.datetime"] = "%s (%s)" % (result["airdate"], result["airtime"])
         result["seriesid"] = episode_details["seriesId"]
         # append seriesinfo to details if provided
         if seriesdetails:
