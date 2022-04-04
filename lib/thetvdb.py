@@ -252,7 +252,6 @@ class TheTvDb(object):
         while not highest_season == -1:
             season_episodes = self.get_series_episodes_by_query(seriesid, "airedSeason=%s" % highest_season)
             season_episodes = sorted(season_episodes, key=lambda k: k.get('airedEpisodeNumber', 0), reverse=True)
-
             highest_eps = (arrow.get("1970-01-01").date(), 0)
             if season_episodes:
                 for episode in season_episodes:
@@ -488,14 +487,9 @@ class TheTvDb(object):
         # make sure we have a decimal in the rating
         if len(str(result["rating"])) == 1:
             result["rating"] = "%s.0" % result["rating"]
-        result["plot"] = episode_details["overview"]
-        if "H" in xbmc.getRegion('time'):
-            fmt = "YYYY-MM-DD hh:mm ZZZ"
-        if "I" in xbmc.getRegion('time'):
-            fmt = "YYYY-MM-DD h:mm A ZZZ"         
-        bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtime"], "America/New_York")
-        utc = arrow.get(bne, fmt)
-        local =  utc.to('local')
+        result["plot"] = episode_details["overview"]      
+        bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtimes"], "America/New_York")
+        local = self._get_local_tza(bne)
         result["airdate"] = local.format('YYYY-MM-DD')
         result["firstaired"] = local.format('YYYY-MM-DD')
         result["airtime"] = self._get_local_time(local.format('H:mm'))
@@ -566,11 +560,22 @@ class TheTvDb(object):
             result["tvdb_id"] = showdetails["id"]
             result["network"] = showdetails["network"]
             result["studio"] = [showdetails["network"]]
-            local_airday, local_airday_short, airday_int = self._get_local_weekday(showdetails["airsDayOfWeek"])
+            if showdetails["airsTime"]:
+                airsTime = self._get_local_time(showdetails["airsTime"])
+            else:
+                if "H" in xbmc.getRegion('time'):
+                    airsTime = "07:00"
+                if "I" in xbmc.getRegion('time'):
+                    airsTime = "06:00 PM"          
+            if showdetails["firstAired"]:    
+                bns = "%s %s %s" % (showdetails["firstAired"], airsTime, "America/New_York")
+                local = self._get_local_tz(bns)
+            local_airday, local_airday_short, airday_int = self._get_local_weekday(local.format('dddd'))
             result["airday"] = local_airday
             result["airday.short"] = local_airday_short
             result["airday.int"] = airday_int
-            result["airtime"] = self._get_local_time(showdetails["airsTime"])
+            result["airtimes"] = showdetails["airsTime"]
+            result["airtime"] = self._get_local_time(local.format('H:mm'))
             result["airdaytime"] = "%s %s (%s)" % (result["airday"], result["airtime"], result["network"])
             result["airdaytime.short"] = "%s %s" % (result["airday.short"], result["airtime"])
             result["airdaytime.label"] = "%s %s - %s %s" % (result["airday"],
@@ -597,7 +602,7 @@ class TheTvDb(object):
             result["genre"] = showdetails["genre"]
             classification = CLASSIFICATION_REGEX.search("/".join(showdetails["genre"])) if isinstance(showdetails["genre"], list) else None
             result["classification"] = classification.group(1) if classification else 'Scripted'
-            result["firstaired"] = showdetails["firstAired"]
+            result["firstaired"] = local.format('YYYY-MM-DD')
             result["imdbnumber"] = showdetails["imdbId"]
             # artwork
             result["art"] = {}
@@ -779,3 +784,19 @@ class TheTvDb(object):
         except Exception as exc:
             self._log_msg(str(exc))
         return (day_name, day_name_short, day_int)
+  
+    def _get_local_tz(self, datetime):
+        '''returns the localized representation of the weekday provided by the api'''
+        if "H" in xbmc.getRegion('time'):
+            fmt = "YYYY-MM-DD hh:mm ZZZ"
+        if "I" in xbmc.getRegion('time'):
+            fmt = "YYYY-MM-DD h:mm A ZZZ"         
+        utc = arrow.get(datetime, fmt)
+        local =  utc.to('local')
+        return (local)
+    def _get_local_tza(self, datetime):
+        '''returns the localized representation of the weekday provided by the api'''
+        fmt = "YYYY-MM-DD h:mm A ZZZ"         
+        utc = arrow.get(datetime, fmt)
+        local =  utc.to('local')
+        return (local) 
