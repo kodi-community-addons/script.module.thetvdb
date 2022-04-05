@@ -501,14 +501,15 @@ class TheTvDb(object):
             result["airdate.datetime"] = "%s (%s)" % (result["airdate"], result["airtime"])
             result["seriesid"] = episode_details["seriesId"]
             result["airdatetime"] = "%s %s" % (result["airdate"], result["airtime"])
-            result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
-                                                          xbmc.getLocalizedString(145), result["network"])
+
         # append seriesinfo to details if provided
         if seriesdetails:
             result["tvshowtitle"] = seriesdetails["title"]
             result["showtitle"] = seriesdetails["title"]
             result["network"] = seriesdetails["network"]
             result["studio"] = seriesdetails["studio"]
+            result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
+                                                          xbmc.getLocalizedString(145), result["network"])
             result["genre"] = seriesdetails["genre"]
             result["classification"] = seriesdetails["classification"]
             result["tvshow.firstaired"] = seriesdetails["firstaired"]
