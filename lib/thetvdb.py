@@ -487,19 +487,22 @@ class TheTvDb(object):
         # make sure we have a decimal in the rating
         if len(str(result["rating"])) == 1:
             result["rating"] = "%s.0" % result["rating"]
-        result["plot"] = episode_details["overview"]      
-        bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtimes"], "America/New_York")
-        local = self._get_local_tza(bne)
-        result["airdate"] = local.format('YYYY-MM-DD')
-        result["firstaired"] = local.format('YYYY-MM-DD')
-        result["airtime"] = self._get_local_time(local.format('H:mm'))
-        result["airdate.long"] = self._get_local_date(result["airdate"], True)
-        result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
-        result["airday"] = local.format('dddd')
-        result["airdate.long"] = self._get_local_date(result["airdate"], True)
-        result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
-        result["airdate.datetime"] = "%s (%s)" % (result["airdate"], result["airtime"])
-        result["seriesid"] = episode_details["seriesId"]
+        result["plot"] = episode_details["overview"]
+        if seriesdetails["airtimes"]:
+            bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtimes"], "America/New_York")
+            local = self._get_local_tza(bne)
+            result["firstaired"] = local.format('YYYY-MM-DD')
+            result["airtime"] = self._get_local_time(local.format('H:mm'))
+            result["airday.int"] = local.format('d')
+            result["airday"] = local.format('dddd')
+            result["airdate"] = local.format('YYYY-MM-DD')
+            result["airdate.long"] = self._get_local_date(result["airdate"], True)
+            result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
+            result["airdate.datetime"] = "%s (%s)" % (result["airdate"], result["airtime"])
+            result["seriesid"] = episode_details["seriesId"]
+            result["airdatetime"] = "%s %s" % (result["airdate"], result["airtime"])
+            result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
+                                                          xbmc.getLocalizedString(145), result["network"])
         # append seriesinfo to details if provided
         if seriesdetails:
             result["tvshowtitle"] = seriesdetails["title"]
@@ -510,10 +513,6 @@ class TheTvDb(object):
             result["classification"] = seriesdetails["classification"]
             result["tvshow.firstaired"] = seriesdetails["firstaired"]
             result["tvshow.status"] = seriesdetails["status"]
-            result["airday.int"] = local.format('d')
-            result["airdatetime"] = "%s %s" % (result["airdate"], result["airtime"])
-            result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
-                                                          xbmc.getLocalizedString(145), result["network"])
             result["art"]["tvshow.poster"] = seriesdetails["art"].get("poster", "")
             result["art"]["tvshow.landscape"] = seriesdetails["art"].get("landscape", "")
             result["art"]["tvshow.fanart"] = seriesdetails["art"].get("fanart", "")
