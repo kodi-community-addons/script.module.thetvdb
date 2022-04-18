@@ -6,7 +6,6 @@
     Includes the most common actions including a few special ones for Kodi use
     Full series and episode data is mapped into Kodi compatible format
 '''
-import os, sys
 import requests
 from requests.packages.urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
@@ -21,11 +20,8 @@ except ImportError:
     import json
 from simplecache import use_cache, SimpleCache
 import arrow
-if sys.version_info.major == 3:
-    import urllib.request, urllib.error
-    from urllib.parse import unquote
-else:
-    import urllib
+import urllib.request, urllib.error
+from urllib.parse import unquote
 import re
 
 # set some parameters to the requests module
@@ -38,10 +34,7 @@ SES.mount('https://', HTTPAdapter(max_retries=RETRIES))
 ADDON_ID = "script.module.thetvdb"
 KODI_LANGUAGE = xbmc.getLanguage(xbmc.ISO_639_1)
 KODI_VERSION = int(xbmc.getInfoLabel("System.BuildVersion").split(".")[0])
-if KODI_VERSION > 16:
-    KODI_TV_PROPS = '"file", "title", "year", "imdbnumber", "art", "genre", "cast", "studio", "uniqueid"'
-else:
-    KODI_TV_PROPS = '"file", "title", "year", "imdbnumber", "art", "genre", "cast", "studio"'
+KODI_TV_PROPS = '"file", "title", "year", "imdbnumber", "art", "genre", "cast", "studio", "uniqueid"'
 CLASSIFICATION_REGEX = re.compile(
     r"(?:^| \| )(Scripted|Mini-Series|Documentary|Animation|Game Show|Reality|Talk Show|Variety)( \| |$)")
 
@@ -64,10 +57,7 @@ class TheTvDb(object):
         self.cache = SimpleCache()
         self._win = xbmcgui.Window(10000)
         self._addon = xbmcaddon.Addon(ADDON_ID)
-        if sys.version_info.major == 3:
-            addonversion = self._addon.getAddonInfo('version')
-        else:    
-            addonversion = self._addon.getAddonInfo('version').decode("utf-8")    
+        addonversion = self._addon.getAddonInfo('version')   
         self.cache.global_checksum = "%s%s" % (addonversion, KODI_LANGUAGE)
         self._log_msg("Initialized")
 
@@ -96,20 +86,14 @@ class TheTvDb(object):
         try:
             response = requests.get(url, headers=headers, timeout=20)
             if response and response.content and response.status_code == 200:
-                if sys.version_info.major == 3:
-                    data = json.loads(response.content)
-                else:
-                    data = json.loads(response.content.decode('utf-8', 'replace'))
+                data = json.loads(response.content)
             elif response.status_code == 401:
                 # token expired, refresh it and repeat our request
                 self._log_msg("Token expired, refreshing...")
                 headers['Bearer'] = self._get_token(True)
                 response = requests.get(url, headers=headers, timeout=5)
                 if response and response.content and response.status_code == 200:
-                    if sys.version_info.major == 3:
-                        data = json.loads(response.content)
-                    else:
-                        data = json.loads(response.content.decode('utf-8', 'replace'))
+                    data = json.loads(response.content)
             if data.get("data"):
                 data = data["data"]
         except Exception as exc:
@@ -491,11 +475,13 @@ class TheTvDb(object):
         if seriesdetails["airtimes"]:
             bne = "%s %s %s" % (episode_details["firstAired"], seriesdetails["airtimes"], "America/New_York")
             local = self._get_local_tza(bne)
+            #self._log_msg("Exception in get_episode_data_tz- %s --> %s - %s " % (xbmc.getRegion('time'), bne, local))
             result["firstaired"] = local.format('YYYY-MM-DD')
-            result["airtime"] = self._get_local_time(local.format('H:mm'))
+            result["airtime"] = local.format('H:mm')
             result["airday.int"] = local.format('d')
             result["airday"] = local.format('dddd')
             result["airdate"] = local.format('YYYY-MM-DD')
+            #self._log_msg("Exception in get_episode_airdatetime --> %s - %s " % (result["airdate"], result["airtime"]))
             result["airdate.long"] = self._get_local_date(result["airdate"], True)
             result["airdate.label"] = "%s (%s)" % (result["label"], result["airdate"])
             result["airdate.datetime"] = "%s (%s)" % (result["airdate"], result["airtime"])
@@ -571,6 +557,7 @@ class TheTvDb(object):
                 bns = "%s %s %s" % (showdetails["firstAired"], airsTime, "America/New_York")
                 local = self._get_local_tz(bns)
             local_airday, local_airday_short, airday_int = self._get_local_weekday(local.format('dddd'))
+            #self._log_msg("Exception in get_series_data_tz %s--> %s - %s " % (showdetails["seriesName"], bns, local))
             result["airday"] = local_airday
             result["airday.short"] = local_airday_short
             result["airday.int"] = airday_int
@@ -719,10 +706,7 @@ class TheTvDb(object):
         '''helper to get data from the kodi json database'''
         json_response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method" : "%s", "params": %s, "id":1 }'
                                             % (method, params))
-        if sys.version_info.major == 3:
-            jsonobject = json.loads(json_response)
-        else:
-            jsonobject = json.loads(json_response.decode('utf-8', 'replace'))
+        jsonobject = json.loads(json_response)
         if 'result' in jsonobject:
             jsonobject = jsonobject['result']
         return jsonobject
