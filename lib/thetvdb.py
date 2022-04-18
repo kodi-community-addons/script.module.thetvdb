@@ -195,7 +195,7 @@ class TheTvDb(object):
         '''
         return self.get_data("series/%s/actors" % seriesid)
 
-    @use_cache(30)
+    @use_cache(60)
     def get_series_episodes(self, seriesid):
         '''
             Returns all episodes for a given series.
@@ -546,6 +546,13 @@ class TheTvDb(object):
             result["tvdb_id"] = showdetails["id"]
             result["network"] = showdetails["network"]
             result["studio"] = [showdetails["network"]]
+            cast = self.get_series_actors(showdetails["id"])
+            if cast:
+                for count, item in enumerate(cast):
+                    if count < 4:
+                        result["cast.%s.tvdbname" % count] = item["name"]
+                        result["cast.%s.tvdbrole" % count] = item["role"]
+                        result["cast.%s.tvdbthumb" % count] = "https://artworks.thetvdb.com/banners/%s" % item["image"] 
             if showdetails["airsTime"]:
                 airsTime = self._get_local_time(showdetails["airsTime"])
             else:
