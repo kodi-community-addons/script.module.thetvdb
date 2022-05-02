@@ -464,9 +464,12 @@ class TheTvDb(object):
                                          episode_details["airedEpisodeNumber"], episode_details["episodeName"])
         result["season"] = episode_details["airedSeason"]
         result["episode"] = episode_details["airedEpisodeNumber"]
-        result["writer"] = episode_details["writers"]
-        result["director"] = episode_details["directors"]
-        result["gueststars"] = episode_details["guestStars"]
+        writer = str(episode_details["writers"])[1:-1]
+        result["writer"] = writer.replace("'", "")
+        director = str(episode_details["directors"])[1:-1]
+        result["director"] = director.replace("'", "")
+        guestStars = str(episode_details["guestStars"])[1:-1]
+        result["gueststars"] = guestStars.replace("'", "")
         result["rating"] = episode_details["siteRating"]
         # make sure we have a decimal in the rating
         if len(str(result["rating"])) == 1:
@@ -487,15 +490,14 @@ class TheTvDb(object):
             result["airdate.datetime"] = "%s (%s)" % (result["airdate"], result["airtime"])
             result["seriesid"] = episode_details["seriesId"]
             result["airdatetime"] = "%s %s" % (result["airdate"], result["airtime"])
-
+            result["airdatetime.label"] = "%s %s - %s %s" % (result["airdate"], result["airtime"], 
+                                                          xbmc.getLocalizedString(145), seriesdetails["network"])
         # append seriesinfo to details if provided
         if seriesdetails:
             result["tvshowtitle"] = seriesdetails["title"]
             result["showtitle"] = seriesdetails["title"]
             result["network"] = seriesdetails["network"]
             result["studio"] = seriesdetails["studio"]
-            result["airdatetime.label"] = "%s - %s %s" % (result["airdatetime"],
-                                                          xbmc.getLocalizedString(145), result["network"])
             result["genre"] = seriesdetails["genre"]
             result["classification"] = seriesdetails["classification"]
             result["tvshow.firstaired"] = seriesdetails["firstaired"]
