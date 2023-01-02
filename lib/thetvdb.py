@@ -265,16 +265,7 @@ class TheTvDb(object):
             imdbid=X --> IMDB id of the series
             Note: output is only summary of episode details (non kodi formatted)
         '''
-        all_episodes = []
-        page = 1
-        while True:
-            # get all episodes by iterating over the pages
-            data = self.get_data("series/%s/episodes/query?%s&page=%s" % (seriesid, query, page))
-            if not data:
-                break
-            else:
-                all_episodes += data
-                page += 1
+        all_episodes = self.get_data("series/%s/episodes/query?%s&page=1" % (seriesid, query))
         return all_episodes
 
     @use_cache(7)
