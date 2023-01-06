@@ -532,7 +532,7 @@ class TheTvDb(object):
     def _map_series_data(self, showdetails):
         '''maps the tvdb data to more kodi compatible format'''
         result = {}
-        if showdetails:
+        if showdetails and not showdetails["status"] == "":
             result["title"] = showdetails["seriesName"]
             result["status"] = showdetails["status"]
             result["tvdb_status"] = showdetails["status"]
